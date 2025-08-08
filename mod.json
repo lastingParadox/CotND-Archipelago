@@ -1,0 +1,14 @@
+{
+    "namespace": "AP",
+    "displayName": "ArchipelagoMod",
+    "version": "1.0.0",
+    "synchronyVersion": "4.1.1",
+    "description": "No description given.",
+    "author": "lastingParadox",
+    "dependencies": {},
+    "api": { "scriptPath": "" },
+    "icon": "APIcon.png",
+    "banner": "APBanner.png",
+    "tags": [],
+    "name": "ArchipelagoMod"
+}
