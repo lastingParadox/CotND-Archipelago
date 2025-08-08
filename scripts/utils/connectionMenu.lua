@@ -40,7 +40,9 @@ Event.menu.add("archipelagoMenuConnect", "Archipelago_Connect", function(ev)
 
             APGeneration.generateLobbyTraps(playerEntity.name)
             if not APGeneration.shopsPopulated then
-                APGeneration.populateLobbyShops(APGeneration.apLobbyX, APGeneration.apLobbyY)
+                APGeneration.populateLobbyShops(APGeneration.shops.hephaestusItems, APGeneration.shops
+                    .dungeonMasterItems,
+                    APGeneration.shops.merlinItems)
                 APGeneration.setShopsPopulated(true)
             end
 
