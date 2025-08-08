@@ -68,7 +68,7 @@ local function renderHintOrName(entity, labelField, itemHints, itemHintsDistance
 
     local x, y = visualExtent.getTileCenter(entity)
 
-    if (entity.AP_player and entity.AP_player.name and entity.AP_player.name ~= apConnection.saveData.slotName) then
+    if (entity.AP_player and entity.AP_player.name ~= "" and entity.AP_player.name ~= apConnection.saveData.slotName) then
         renderText({
             text = entity.AP_player.name .. "'s",
             x = x,
@@ -78,11 +78,18 @@ local function renderHintOrName(entity, labelField, itemHints, itemHintsDistance
         })
     end
 
+    local colorVar = colors[(entity.AP_itemClass and entity.AP_itemClass.classification) or 0] or
+        color.rgb(255, 255, 255)
+    if not (entity.AP_player and entity.AP_player.name ~= "" and entity.AP_player.name ~= apConnection.saveData.slotName) then
+        colorVar =
+            color.rgb(255, 255, 255)
+    end
+
     return renderText({
         text = text,
         x = x,
         y = y + label.offsetY - 8 * adjacentItems,
-        fillColor = colors[(entity.AP_itemClass and entity.AP_itemClass.classification) or 0] or color.rgb(255, 255, 255),
+        fillColor = colorVar,
         buffer = render.Buffer.TEXT_LABEL_FRONT
     })
 end
@@ -96,7 +103,7 @@ event.render.override("renderItemHintLabels", { sequence = 1 }, function(func, e
         for entity in ecs.entitiesWithComponents({
             "AP_itemHintLabel",
         }) do
-            if hintsVisibleFor(entity) then
+            if hintsVisibleFor(entity) and entity.AP_itemHintLabel.text ~= "" then
                 renderHintOrName(entity, "AP_itemHintLabel", itemHints, itemHintsDistance, itemNames)
             end
         end

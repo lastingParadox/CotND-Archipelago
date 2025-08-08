@@ -118,8 +118,8 @@ Event.levelLoad.add("updateSeenCounts", { order = "currentLevel" }, function(ev)
                 ItemGen.markSeen(name, -ItemGen.getSeenCount(name))
             end
         else
-            if ItemGen.getSeenCount(name) < 99 then
-                ItemGen.markSeen(name, 99)
+            if ItemGen.getSeenCount(name) < 999 then
+                ItemGen.markSeen(name, 999)
             end
         end
     end
