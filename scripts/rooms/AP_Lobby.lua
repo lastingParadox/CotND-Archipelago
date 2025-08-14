@@ -149,25 +149,16 @@ function apLobby.generateLobbyTraps(character, lobbyX, lobbyY)
     end
 
     -- All zones
-    Tile.setType(offsetX, offsetY, "LobbyStairs")
-    local trap = Map.firstWithComponent(offsetX, offsetY, "trapStartRun")
-    trap = trap or Object.spawn("TriggerStartRun", offsetX, offsetY)
-    trap.trapStartRun.mode = "AP_APAllZones"
+    Object.spawn("AP_TriggerAPTrap", offsetX, offsetY)
     lobbyUtils.addLabel(offsetX, offsetY, "label.lobby.stair.allZones")
 
     offsetX = offsetX - 2
     offsetY = offsetY + 2
 
     for i = 1, 5 do
-        if i == 1 or unlockedZones["Zone" .. i] then
-            Tile.setType(offsetX, offsetY, "LobbyStairs")
-            trap = Map.firstWithComponent(offsetX, offsetY, "trapStartRun")
-            trap = trap or Object.spawn("TriggerStartRun", offsetX, offsetY)
-            trap.trapStartRun.mode = "AP_APSingleZone"
-            trap.trapStartRun.zone = i
-        else
-            Tile.setType(offsetX, offsetY, "LobbyLockedStairs")
-        end
+        Object.spawn("AP_TriggerAPTrap", offsetX, offsetY, {
+            trapStartRun = { mode = "AP_APSingleZone", zone = i }
+        })
         lobbyUtils.addLabel(offsetX, offsetY, zoneText[i])
 
         offsetX = offsetX + 2

@@ -45,13 +45,13 @@ local APConnection = {
 -- Config
 local infile = "in.log"
 local outfile = "out.log"
+local bounce_sent = false
 local saveStorage = ""
-local last_client_update = 0
-local connected_timestamp = timer.unixTimestamp()
+local last_mod_update = 0
+local latest_client_timestamp = 0
 local last_message_received = 0
 local disconnect_timeout = 10
 local seed = ""
-local slot = 0
 local slot_name = ""
 local deathlinkPending = false
 local deathlinkMessage = ""
@@ -233,12 +233,13 @@ end
 
 APConnection.handlers[MessageTypes.DEATH] = function(entry)
     deathlinkPending = true
-    deathlinkMessage = entry.source or ""
+    deathlinkMessage = entry.source or entry.msg or "Archipelago"
 end
 
 APConnection.handlers[MessageTypes.DISCONNECTED] = function(entry)
     APConnection.connected = false
     APConnection.connection.status = "Disconnected"
+    bounce_sent = false
     APConnection.initFiles()
 end
 
@@ -289,6 +290,43 @@ function APConnection.changeDiamonds(amount)
     APConnection.updateSave = true
 end
 
+function APConnection.sendDeathlink(message)
+    APConnection.outputData["Death"] = { msg = message }
+end
+
+function APConnection.addLevelCompleteChecks(checksList, character)
+    local charData = APConnection.saveData.characterLocations[character] or {}
+
+    for _, level in ipairs(checksList) do
+        if charData[level] == false then
+            if APConnection.outputData["Location"] == nil then
+                APConnection.outputData["Location"] = {}
+            end
+            table.insert(APConnection.outputData["Location"], character .. " - " .. level)
+            charData[level] = true
+        end
+    end
+
+    -- In the case this check causes the goal condition to be met
+    APConnection.calculateGoalCompletion()
+
+    APConnection.updateSave = true
+end
+
+function APConnection.calculateGoalCompletion()
+    local goalAmount = APConnection.saveData.goal
+    local characterLocations = APConnection.saveData.characterLocations
+    local completedSum = 0
+
+    for _, characterLocation in pairs(characterLocations) do
+        if (characterLocation["All Zones"] == true) then completedSum = completedSum + 1 end
+    end
+
+    if completedSum >= goalAmount then
+        APConnection.outputData["Victory"] = {}
+    end
+end
+
 function APConnection.addCheckToCollectedCache(locCode)
     if locCode == nil or locCode == "" then
         return
@@ -305,7 +343,7 @@ function APConnection.applyDeathLink()
         damage.inflict({
             victim = entity,
             damage = 100,
-            type = damage.type.SUICIDE,
+            type = damage.Flag.AP_DEATH_LINK,
             killerName = deathlinkMessage,
         })
     end
@@ -327,9 +365,8 @@ function APConnection.retrieveData()
     if not decoded then return end
 
     seed = decoded.seed_name
-    slot = decoded.slot
     slot_name = decoded.slot_name
-    connected_timestamp = decoded.connected_timestamp
+    latest_client_timestamp = decoded.timestamp
 
     if saveStorage == "" then
         saveStorage = seed .. "_" .. slot_name .. ".txt"
@@ -364,14 +401,25 @@ event.tick.add("apUpdate", { order = "lobby", sequence = 1 }, function()
     if not APConnection.connected then return end
 
     -- We only want to update the client if enough time has passed since the last update
-    if #APConnection.outputData == 0 and (timer.unixTimestamp() - last_client_update < 1) then return end
-    last_client_update = timer.unixTimestamp()
+    if #APConnection.outputData == 0 and (timer.unixTimestamp() - last_mod_update < 1) then return end
+    last_mod_update = timer.unixTimestamp()
 
     APConnection.writeData()
     APConnection.retrieveData()
 
     if deathlinkPending then
         APConnection.applyDeathLink()
+    end
+
+    if (last_mod_update - latest_client_timestamp >= 3 and last_mod_update - latest_client_timestamp < 5) then
+        if not bounce_sent then
+            APConnection.outputData["Bounce"] = {}
+            bounce_sent = true
+        end
+    elseif last_mod_update - latest_client_timestamp >= 5 then
+        APConnection.handlers[MessageTypes.DISCONNECTED]()
+    else
+        bounce_sent = false
     end
 end)
 
@@ -393,14 +441,15 @@ if hasStorage and not APConnection.connected then
     local clearLogs = false
     local infileContents = APConnection.storage.readFile(infile)
 
-    if infileContents == "" then
+    if infileContents == nil or infileContents == "" then
         clearLogs = true
     else
         local parsed = json.decode(infileContents)
         if parsed and parsed.data then
             local allOlder = true
+            local time = timer.unixTimestamp()
             for _, entry in ipairs(parsed.data) do
-                if entry.timestamp >= (connected_timestamp - 180) then
+                if entry.timestamp >= (time - 180) then
                     allOlder = false
                     break
                 end

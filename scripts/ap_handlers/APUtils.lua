@@ -35,15 +35,11 @@ apUtils.characterSet = {
     ["Mary"] = true,
     ["Tempo"] = true,
     ["Reaper"] = true,
-    ["Sync_Klarinetta"] = true,
-    ["Sync_Chaunter"] = true,
-    ["Sync_Suzu"] = true,
-    ["Coldsteel_Coldsteel"] = true,
+    ["Klarinetta"] = true,
+    ["Chaunter"] = true,
+    ["Suzu"] = true,
+    ["Miku"] = true,
 }
-
-function apUtils.isCharacter(item)
-    return apUtils.characterSet[item] == true
-end
 
 apUtils.PriceRandomizationType = {
     VANILLA = 0,
@@ -51,6 +47,29 @@ apUtils.PriceRandomizationType = {
     ITEM_CLASS = 2,
     COMPLETE = 3,
 }
+
+function apUtils.apLocationToCotNDChar(character)
+    if character == "Klarinetta" then return "Sync_Klarinetta"
+    elseif character == "Chaunter" then return "Sync_Chaunter"
+    elseif character == "Suzu" then return "Sync_Suzu"
+    elseif character == "Miku" then return "Coldsteel_Coldsteel" end
+
+    return character
+end
+
+function apUtils.cotNDCharToAPLocation(character)
+    if character == "Sync_Klarinetta" then return "Klarinetta"
+    elseif character == "Sync_Chaunter" then return "Chaunter"
+    elseif character == "Sync_Suzu" then return "Suzu"
+    elseif character == "Coldsteel_Coldsteel" then return "Miku" end
+
+    return character
+end
+
+function apUtils.isCharacter(item)
+    local character = apUtils.cotNDCharToAPLocation(item)
+    return apUtils.characterSet[character] == true
+end
 
 -- To be ran on save initialization
 function apUtils.parseMissingLocations(saveData, missing_locations)

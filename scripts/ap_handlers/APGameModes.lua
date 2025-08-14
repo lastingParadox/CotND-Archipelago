@@ -1,8 +1,10 @@
 local currency = require "necro.game.item.Currency"
+local damage = require "necro.game.system.Damage"
 local Event = require("necro.event.Event")
 local CurrentLevel = require("necro.game.level.CurrentLevel")
 local Enum = require("system.utils.Enum")
 local LevelLoader = require "necro.game.level.LevelLoader"
+local InstantReplay = require "necro.client.replay.InstantReplay"
 local GameSession = require "necro.client.GameSession"
 local gameState = require("necro.client.GameState")
 local TileTypes = require "necro.game.tile.TileTypes"
@@ -17,6 +19,8 @@ local apConnection = require("AP.scripts.ap_handlers.APConnection")
 local apItems = require("AP.scripts.ap_handlers.APItems")
 local apShops = require("AP.scripts.rooms.AP_Shops")
 local apUtils = require("AP.scripts.ap_handlers.APUtils")
+
+damage.Flag.extend("AP_DEATH_LINK")
 
 local supportedModes = {
     [8] = "No Return",
@@ -141,25 +145,13 @@ Event.levelComplete.add("apLevelComplete", { order = "winScreen" }, function(ev)
         table.insert(zones, "All Zones")
 
         for key, name in pairs(supportedModes) do
-            print("Checking mode:", key, name, extraMode.isActive(key))
             if extraMode.isActive(key) then
                 table.insert(zones, name .. " Mode")
             end
         end
     end
 
-    local charLocs = APConnection.saveData.characterLocations or {}
-    local charData = charLocs[character] or {}
-
-    for _, level in ipairs(zones) do
-        if charData[level] == false then
-            if APConnection.outputData["Location"] == nil then
-                APConnection.outputData["Location"] = {}
-            end
-            table.insert(APConnection.outputData["Location"], character .. " - " .. level)
-            charData[level] = true
-        end
-    end
+    APConnection.addLevelCompleteChecks(zones, character)
 end)
 
 event.objectTryCollectItem.add("pickupAPCurrency", { order = "checkItem" }, function(ev)
@@ -173,5 +165,15 @@ event.objectTryCollectItem.add("pickupAPCurrency", { order = "checkItem" }, func
 
     if ev.item.itemCurrency and ev.item.itemCurrency.currencyType == currency.Type.DIAMOND then
         apConnection.changeDiamonds(ev.item.itemStack.quantity)
+    end
+end)
+
+Event.objectDeath.add("apSendDeathlink", { order = "kill", filter = "playableCharacter"}, function(ev)
+    local mode = GameSession.getCurrentMode().id
+    if not ((mode == "APAllZones" or mode == "APSingleZone") and APConnection.connected) then return end
+
+    if (not InstantReplay.isActive() and ev.damageType ~= damage.Flag.AP_DEATH_LINK) then
+        local killerName = ev.killerName or ev.killer.friendlyName.name or "something"
+        APConnection.sendDeathlink(APConnection.saveData.slotName .. " was killed by " .. killerName .. ".")
     end
 end)

@@ -89,7 +89,7 @@ CustomEntities.register({
 })
 
 local function isCharacterLocked(name)
-    return not (APConnection.saveData.characters and APConnection.saveData.characters[name])
+    return not (APConnection.connected and APConnection.saveData.characters and APConnection.saveData.characters[name])
 end
 
 event.render.add("characterPreviewAP", { order = "characterPreview" }, function(ev)
@@ -303,10 +303,6 @@ event.objectInteract.add("characterSelectAP", {
     local playerID = ev.interactor.id
 
     if playerID and ecs.typeHasComponent(characterType, "controllable") then
-        if not localCoop.isLocal(playerID) then
-            return
-        end
-
         local unlockText = L("Locked!", "flyaway.characterLocked.generic")
         if not gameDLC.isCharacterOwned(characterType) then
             local prototype = ecs.getEntityPrototype(characterType)
