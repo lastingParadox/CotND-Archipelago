@@ -100,6 +100,9 @@ function apLobby.createMainAPLobby()
     apLobby.generateLobbyTraps(playerEntity.name, centerX, 0)
 
     -- Setting traps for traversal between AP and Lobby
+
+    Object.spawn("AP_ShrineOfExchange", minX + 3, 0)
+
     lobbyUtils.addBackToLobby(maxX - 3, 0)
 
     local lobbyX, lobbyY = 3, 0
