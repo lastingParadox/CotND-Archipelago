@@ -1,0 +1,240 @@
+<?xml version="1.0"?>
+<dungeon character="1009" health="1" name="AP_codex_bomb_lore" numLevels="1">
+	<level bossNum="-1" music="training" num="1">
+		<tiles>
+			<tile x="-3" y="-3" type="108" />
+			<tile x="-2" y="-3" type="108" />
+			<tile x="-1" y="-3" type="108" />
+			<tile x="-3" y="-2" type="108" />
+			<tile x="-2" y="-2" type="0" />
+			<tile x="-1" y="-2" type="108" />
+			<tile x="-3" y="-1" type="108" />
+			<tile x="-2" y="-1" type="0" />
+			<tile x="-1" y="-1" type="108" torch="1" />
+			<tile x="-3" y="0" type="108" />
+			<tile x="-2" y="0" type="0" />
+			<tile x="-1" y="0" type="108" />
+			<tile x="-3" y="1" type="108" />
+			<tile x="-2" y="1" type="0" />
+			<tile x="-1" y="1" type="108" torch="1" />
+			<tile x="-3" y="2" type="108" />
+			<tile x="-2" y="2" type="0" />
+			<tile x="-1" y="2" type="108" />
+			<tile x="-3" y="3" type="108" />
+			<tile x="-2" y="3" type="108" />
+			<tile x="-1" y="3" type="108" />
+			<tile x="0" y="-3" type="108" />
+			<tile x="1" y="-3" type="108" />
+			<tile x="2" y="-3" type="108" />
+			<tile x="3" y="-3" type="108" />
+			<tile x="4" y="-3" type="108" />
+			<tile x="5" y="-3" type="108" />
+			<tile x="6" y="-3" type="108" />
+			<tile x="7" y="-3" type="108" />
+			<tile x="0" y="-2" type="108" />
+			<tile x="1" y="-2" type="108" />
+			<tile x="2" y="-2" type="108" />
+			<tile x="3" y="-2" type="108" />
+			<tile x="4" y="-2" type="108" />
+			<tile x="5" y="-2" type="108" />
+			<tile x="6" y="-2" type="108" />
+			<tile x="7" y="-2" type="108" />
+			<tile x="0" y="-1" type="108" />
+			<tile x="1" y="-1" type="108" />
+			<tile x="2" y="-1" type="108" />
+			<tile x="3" y="-1" type="108" torch="1" />
+			<tile x="4" y="-1" type="108" />
+			<tile x="5" y="-1" type="108" />
+			<tile x="6" y="-1" type="108" />
+			<tile x="7" y="-1" type="108" />
+			<tile x="0" y="0" type="0" />
+			<tile x="1" y="0" type="0" />
+			<tile x="2" y="0" type="0" />
+			<tile x="3" y="0" type="0" />
+			<tile x="4" y="0" type="0" />
+			<tile x="5" y="0" type="0" />
+			<tile x="6" y="0" type="108" />
+			<tile x="7" y="0" type="108" />
+			<tile x="8" y="0" type="108" />
+			<tile x="9" y="0" type="108" />
+			<tile x="10" y="0" type="108" />
+			<tile x="11" y="0" type="108" />
+			<tile x="12" y="0" type="108" />
+			<tile x="13" y="0" type="108" />
+			<tile x="14" y="0" type="108" />
+			<tile x="15" y="0" type="108" />
+			<tile x="0" y="1" type="108" />
+			<tile x="1" y="1" type="108" />
+			<tile x="2" y="1" type="108" />
+			<tile x="3" y="1" type="108" torch="1" />
+			<tile x="4" y="1" type="108" />
+			<tile x="5" y="1" type="0" />
+			<tile x="6" y="1" type="108" />
+			<tile x="7" y="1" type="108" />
+			<tile x="8" y="1" type="108" />
+			<tile x="9" y="1" type="108" />
+			<tile x="10" y="1" type="108" />
+			<tile x="11" y="1" type="108" />
+			<tile x="12" y="1" type="108" torch="1" />
+			<tile x="13" y="1" type="108" />
+			<tile x="14" y="1" type="108" />
+			<tile x="15" y="1" type="108" />
+			<tile x="0" y="2" type="108" />
+			<tile x="1" y="2" type="108" />
+			<tile x="2" y="2" type="108" />
+			<tile x="3" y="2" type="108" />
+			<tile x="4" y="2" type="108" />
+			<tile x="5" y="2" type="0" />
+			<tile x="6" y="2" type="108" torch="1" />
+			<tile x="7" y="2" type="0" />
+			<tile x="8" y="2" type="0" />
+			<tile x="9" y="2" type="0" />
+			<tile x="10" y="2" type="0" />
+			<tile x="11" y="2" type="0" />
+			<tile x="12" y="2" type="0" />
+			<tile x="13" y="2" type="0" />
+			<tile x="14" y="2" type="0" />
+			<tile x="15" y="2" type="0" />
+			<tile x="0" y="3" type="108" />
+			<tile x="1" y="3" type="108" />
+			<tile x="2" y="3" type="108" />
+			<tile x="3" y="3" type="108" />
+			<tile x="4" y="3" type="108" />
+			<tile x="5" y="3" type="0" />
+			<tile x="6" y="3" type="108" />
+			<tile x="7" y="3" type="108" />
+			<tile x="8" y="3" type="108" />
+			<tile x="9" y="3" type="108" />
+			<tile x="10" y="3" type="0" />
+			<tile x="11" y="3" type="108" />
+			<tile x="12" y="3" type="108" torch="1" />
+			<tile x="13" y="3" type="108" />
+			<tile x="14" y="3" type="108" />
+			<tile x="15" y="3" type="108" />
+			<tile x="2" y="4" type="108" />
+			<tile x="3" y="4" type="108" />
+			<tile x="4" y="4" type="108" torch="1" />
+			<tile x="5" y="4" type="0" />
+			<tile x="6" y="4" type="108" />
+			<tile x="7" y="4" type="108" />
+			<tile x="8" y="4" type="108" />
+			<tile x="9" y="4" type="108" torch="1" />
+			<tile x="10" y="4" type="0" />
+			<tile x="11" y="4" type="108" />
+			<tile x="12" y="4" type="108" />
+			<tile x="13" y="4" type="108" />
+			<tile x="14" y="4" type="108" />
+			<tile x="15" y="4" type="108" />
+			<tile x="2" y="5" type="108" />
+			<tile x="3" y="5" type="108" />
+			<tile x="4" y="5" type="108" />
+			<tile x="5" y="5" type="108" />
+			<tile x="6" y="5" type="108" />
+			<tile x="7" y="5" type="108" />
+			<tile x="8" y="5" type="108" />
+			<tile x="9" y="5" type="108" />
+			<tile x="10" y="5" type="LobbyStairs" />
+			<tile x="11" y="5" type="108" />
+			<tile x="12" y="5" type="108" />
+			<tile x="2" y="6" type="108" />
+			<tile x="3" y="6" type="108" />
+			<tile x="4" y="6" type="108" />
+			<tile x="5" y="6" type="108" />
+			<tile x="6" y="6" type="108" />
+			<tile x="7" y="6" type="108" />
+			<tile x="8" y="6" type="108" />
+			<tile x="9" y="6" type="108" />
+			<tile x="10" y="6" type="0" />
+			<tile x="11" y="6" type="108" />
+			<tile x="12" y="6" type="108" />
+			<tile x="2" y="7" type="108" />
+			<tile x="3" y="7" type="108" />
+			<tile x="4" y="7" type="108" />
+			<tile x="5" y="7" type="108" />
+			<tile x="6" y="7" type="108" />
+			<tile x="7" y="7" type="108" />
+			<tile x="8" y="7" type="108" />
+			<tile x="9" y="7" type="108" />
+			<tile x="10" y="7" type="108" />
+			<tile x="11" y="7" type="108" />
+			<tile x="12" y="7" type="108" />
+			<tile x="16" y="0" type="108" />
+			<tile x="17" y="0" type="108" />
+			<tile x="18" y="0" type="108" />
+			<tile x="16" y="1" type="108" torch="1" />
+			<tile x="17" y="1" type="108" />
+			<tile x="18" y="1" type="108" />
+			<tile x="16" y="2" type="0" />
+			<tile x="17" y="2" type="108" />
+			<tile x="18" y="2" type="108" />
+			<tile x="16" y="3" type="108" torch="1" />
+			<tile x="17" y="3" type="108" />
+			<tile x="18" y="3" type="108" />
+			<tile x="16" y="4" type="108" />
+			<tile x="17" y="4" type="108" />
+			<tile x="18" y="4" type="108" />
+			<tile x="13" y="5" type="108" />
+			<tile x="14" y="5" type="108" />
+			<tile x="15" y="5" type="108" />
+			<tile x="16" y="5" type="108" />
+			<tile x="17" y="5" type="108" />
+			<tile x="18" y="5" type="108" />
+			<tile x="13" y="6" type="108" />
+			<tile x="14" y="6" type="108" />
+			<tile x="15" y="6" type="108" />
+			<tile x="16" y="6" type="108" />
+			<tile x="17" y="6" type="108" />
+			<tile x="18" y="6" type="108" />
+			<tile x="13" y="7" type="108" />
+			<tile x="14" y="7" type="108" />
+			<tile x="15" y="7" type="108" />
+			<tile x="16" y="7" type="108" />
+			<tile x="17" y="7" type="108" />
+			<tile x="18" y="7" type="108" />
+			<tile x="2" y="8" type="108" />
+			<tile x="3" y="8" type="108" />
+			<tile x="4" y="8" type="108" />
+			<tile x="5" y="8" type="108" />
+			<tile x="6" y="8" type="108" />
+			<tile x="7" y="8" type="108" />
+			<tile x="8" y="8" type="108" />
+			<tile x="9" y="8" type="108" />
+			<tile x="10" y="8" type="108" />
+			<tile x="11" y="8" type="108" />
+			<tile x="12" y="8" type="108" />
+			<tile x="13" y="8" type="108" />
+			<tile x="14" y="8" type="108" />
+			<tile x="15" y="8" type="108" />
+			<tile x="16" y="8" type="108" />
+			<tile x="17" y="8" type="108" />
+			<tile x="18" y="8" type="108" />
+		</tiles>
+		<traps>
+			<trap x="5" y="1" type="1" subtype="2" />
+			<trap x="5" y="2" type="9" subtype="0" />
+			<trap x="5" y="4" type="1" subtype="3" />
+			<trap x="9" y="2" type="1" subtype="0" />
+			<trap x="11" y="2" type="1" subtype="1" />
+			<trap x="10" y="3" type="2" subtype="0" />
+		</traps>
+		<enemies>
+			<enemy x="3" y="0" type="0" />
+			<enemy x="4" y="0" type="408" />
+			<enemy x="-2" y="2" type="408" />
+			<enemy x="-2" y="1" type="408" />
+			<enemy x="-2" y="0" type="408" />
+			<enemy x="-2" y="-1" type="408" />
+			<enemy x="-2" y="-2" type="408" />
+			<enemy x="16" y="2" type="9" />
+		</enemies>
+		<items>
+			<item x="1" y="0" type="weapon_dagger" />
+			<item x="2" y="0" type="bomb" />
+			<item x="8" y="2" type="bomb" />
+		</items>
+		<entities>
+			<entity x="10" y="5" type="TriggerOpenLobby" />
+			<entity x="10" y="4" type="AP_ShopSlot" AP_shopSlot.npc="Codex" AP_shopSlot.type="BombLore" />
+		</entities>
+	</level>
+</dungeon>

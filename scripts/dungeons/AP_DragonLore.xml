@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<dungeon character="1009" health="1" name="AP_codex_dragon_lore" numLevels="1">
+	<level bossNum="-1" music="training" num="1">
+		<tiles>
+			<tile x="-7" y="-1" type="108" />
+			<tile x="-6" y="-1" type="108" torch="1" />
+			<tile x="-5" y="-1" type="108" />
+			<tile x="-4" y="-1" type="108" />
+			<tile x="-3" y="-1" type="108" torch="1" />
+			<tile x="-2" y="-1" type="108" />
+			<tile x="-1" y="-1" type="108" />
+			<tile x="-6" y="0" type="LobbyStairs" />
+			<tile x="-7" y="0" type="108" />
+			<tile x="-5" y="0" type="0" />
+			<tile x="-4" y="0" type="0" />
+			<tile x="-3" y="0" type="0" />
+			<tile x="-2" y="0" type="0" />
+			<tile x="-1" y="0" type="0" />
+			<tile x="-7" y="1" type="108" />
+			<tile x="-6" y="1" type="0" />
+			<tile x="-5" y="1" type="0" />
+			<tile x="-4" y="1" type="0" />
+			<tile x="-3" y="1" type="108" />
+			<tile x="-2" y="1" type="108" />
+			<tile x="-1" y="1" type="108" />
+			<tile x="-7" y="2" type="108" />
+			<tile x="-6" y="2" type="108" torch="1" />
+			<tile x="-5" y="2" type="108" />
+			<tile x="-4" y="2" type="108" />
+			<tile x="-3" y="2" type="108" torch="1" />
+			<tile x="5" y="-2" type="108" />
+			<tile x="6" y="-2" type="108" />
+			<tile x="7" y="-2" type="108" />
+			<tile x="8" y="-2" type="108" torch="1" />
+			<tile x="9" y="-2" type="108" />
+			<tile x="10" y="-2" type="108" />
+			<tile x="11" y="-2" type="108" torch="1" />
+			<tile x="0" y="-1" type="108" torch="1" />
+			<tile x="1" y="-1" type="108" />
+			<tile x="2" y="-1" type="108" />
+			<tile x="3" y="-1" type="108" torch="1" />
+			<tile x="4" y="-1" type="108" />
+			<tile x="5" y="-1" type="108" />
+			<tile x="6" y="-1" type="0" />
+			<tile x="7" y="-1" type="108" />
+			<tile x="8" y="-1" type="108" />
+			<tile x="9" y="-1" type="0" />
+			<tile x="10" y="-1" type="0" />
+			<tile x="11" y="-1" type="108" />
+			<tile x="0" y="0" type="0" />
+			<tile x="1" y="0" type="0" />
+			<tile x="2" y="0" type="0" />
+			<tile x="3" y="0" type="0" />
+			<tile x="4" y="0" type="0" />
+			<tile x="5" y="0" type="0" />
+			<tile x="6" y="0" type="0" />
+			<tile x="7" y="0" type="0" />
+			<tile x="8" y="0" type="0" />
+			<tile x="9" y="0" type="0" />
+			<tile x="10" y="0" type="0" />
+			<tile x="11" y="0" type="108" />
+			<tile x="0" y="1" type="108" torch="1" />
+			<tile x="1" y="1" type="108" />
+			<tile x="2" y="1" type="108" />
+			<tile x="3" y="1" type="108" torch="1" />
+			<tile x="4" y="1" type="108" />
+			<tile x="5" y="1" type="108" />
+			<tile x="6" y="1" type="108" torch="1" />
+			<tile x="7" y="1" type="108" />
+			<tile x="8" y="1" type="108" />
+			<tile x="9" y="1" type="108" torch="1" />
+			<tile x="10" y="1" type="108" />
+			<tile x="11" y="1" type="108" />
+		</tiles>
+		<traps>
+			<trap x="6" y="-1" type="1" subtype="2" />
+		</traps>
+		<items>
+			<item x="10" y="-1" type="weapon_dagger" />
+		</items>
+		<entities>
+			<entity x="-6" y="0" type="TriggerOpenLobby" />
+			<entity x="-4" y="0" type="Dragon2" sprite.mirrorX="-1" />
+			<entity x="5" y="0" type="Monkey" />
+			<entity x="-5" y="0" type="AP_ShopSlot" AP_shopSlot.npc="Codex" AP_shopSlot.type="DragonLore" />
+		</entities>
+	</level>
+</dungeon>
