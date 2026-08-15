@@ -38,7 +38,7 @@ end)
 
 -- Items
 local function addAPItemComponents(entity)
-    entity.AP_itemHintLabel = {}
+    entity.AP_hintLabel = {}
     entity.AP_player = {}
     entity.AP_itemClass = {}
     entity.AP_itemShowcase = {}
@@ -152,18 +152,22 @@ event.entitySchemaLoadEntity.add("playerAPItem", { order = "overrides", sequence
     end
 end)
 
+-- Entity name to sprite, since the two no longer share a spelling.
 local dynCharItems = {
-    ArmorPlatemailDorian = true,
-    Sync_ArmorPlatemailShiny = true,
-    Coldsteel_ArmorVirtual = true,
+    ArmorPlatemailDorian     = "armor_platemail_dorian",
+    Sync_ArmorPlatemailShiny = "armor_platemail_klarinetta",
+    Coldsteel_ArmorVirtual   = "armor_virtual_coldsteel",
 }
 
 event.entitySchemaLoadItem.add("apUniqueDynChar", { order = "overrides" },
     function(ev)
         if not hasDynChar then return end
-        if (dynCharItems[ev.entity.name]) then
+
+        local sprite = dynCharItems[ev.entity.name]
+
+        if sprite then
             ev.entity.DynChar_dynamicItem = {
-                texture = "mods/AP/gfx/armors/" .. ev.entity.name .. ".png",
+                texture = "mods/AP/gfx/armors/" .. sprite .. ".png",
                 framesX = 4,
             }
         end

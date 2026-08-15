@@ -159,8 +159,7 @@ event.apLobbyGenerate.add("generateTraps", "traps", function(ev)
     lobbyUtils.addLabel(offsetX, offsetY, "mod.AP.lobby.stair.zones")
     object.spawn("AP_TriggerAPTrap", offsetX, offsetY)
 
-    -- Shrine of Exchange
-    object.spawn("AP_ShrineOfExchange", offsetX - 5, offsetY - 4)
+    object.spawn("AP_Exchanger", offsetX - 5, offsetY - 4)
 
     offsetX = offsetX - 4
     offsetY = offsetY + 2

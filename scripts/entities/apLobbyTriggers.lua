@@ -62,7 +62,7 @@ do
     end)
 end
 
-local POTION_SHEET  = "mods/AP/gfx/BonusPotionIndicators.png"
+local POTION_SHEET  = "mods/AP/gfx/icons/bonus_potion_indicators.png"
 local POTION_W      = 22
 local POTION_H      = 12
 local POTION_ABOVE  = -13

@@ -21,7 +21,7 @@ components.register({
         components.field.bool("active", false)
     },
     AP_deathlinkShrine = {},
-    AP_exchangeShrine = {},
+    AP_exchanger = {},
     AP_traplinkShrine = {},
     AP_victoryItem = {},
     AP_victorySlot = {},
@@ -63,8 +63,9 @@ components.register({
     AP_itemClass = {
         components.field.int("classification", 0), -- 0 = filler, 1 = progression, 2 = useful, 4 = trap
     },
-    AP_itemHintLabel = {
+    AP_hintLabel = {
         components.field.string("text", ""),
+        components.field.float("offsetX", 0),
         components.field.float("offsetY", -26),
     },
     AP_itemPoolChest = {
@@ -173,19 +174,14 @@ components.register({
         components.field.string("locationName", ""),
         components.field.string("locationCode", ""),
     },
-    -- Which chest-check colour this chest satisfies.
     AP_chestKind = {
         components.constant.string("kind", ""),
     },
-    -- On the upgrade item: the chest it guarantees one of per zone. `order` seeds
-    -- the per-zone RNG channel, so every client picks the same floor.
     AP_chestUpgrade = {
         components.constant.string("chest", ""),
         components.constant.string("chanceType", ""),
         components.constant.int("order", 0),
     },
-    -- Lobby NPCs. `apName` is the AP item/location name, empty for the ones that
-    -- are cageable but not randomised.
     AP_npc = {
         components.constant.string("apName", ""),
     },
@@ -210,10 +206,7 @@ components.register({
     },
     AP_trapJanitorNext = {},
     AP_trapJanitorReset = {},
-    -- Uncertain weapon variants the mod adds on top of Amplified's. AP runs only,
-    -- so vanilla uncertainty shrines keep their original pool.
     AP_uncertainWeapon = {},
-    -- Pawnbroker special offers, which cost the buyer's whole purse less one.
     AP_pawnbrokerPricing = {},
     AP_trapUnlock = {
         components.field.string("lockType", "none"),

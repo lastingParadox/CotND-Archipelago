@@ -148,5 +148,5 @@ event.objectSpawn.add("APTrapSprite", { order = "overrides", filter = "AP_trapIt
     local label = (chosen.itemHintLabel and chosen.itemHintLabel.text) or (chosen.friendlyName and chosen.friendlyName.name)
     local misspelled = getMisspelledName(label, channel)
 
-    trapEntity.AP_itemHintLabel = { text = misspelled }
+    trapEntity.AP_hintLabel = { text = misspelled }
 end)

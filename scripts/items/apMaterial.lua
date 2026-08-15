@@ -1,8 +1,5 @@
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 
--- Six prototypes rather than one entity with a type field: each needs its own
--- sprite in the item room, and progression/items.lua and apShopSlot.lua both
--- address them by the AP_Material<Name> name.
 local MATERIALS = { "Titanium", "Obsidian", "Glass", "Blood", "Gold", "Onyx" }
 
 for _, material in ipairs(MATERIALS) do
@@ -10,7 +7,7 @@ for _, material in ipairs(MATERIALS) do
 
     apItemFactory.define({
         name = "AP_Material" .. material,
-        texture = "materials/Material" .. material .. ".png",
+        texture = "materials/material_" .. string.lower(material) .. ".png",
         destructible = false,
         data = {
             flyaway = material .. " Material",

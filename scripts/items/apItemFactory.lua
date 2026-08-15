@@ -27,7 +27,7 @@ function apItemFactory.define(spec)
     }
 
     if spec.destructible ~= false then components.itemDestructible = {} end
-    if spec.hint then components.AP_itemHintLabel = { text = spec.hint } end
+    if spec.hint then components.AP_hintLabel = { text = spec.hint } end
     if spec.flyaway then components.AP_flyaway = { text = spec.flyaway } end
 
     return customEntities.extend({

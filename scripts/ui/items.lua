@@ -89,6 +89,9 @@ local function renderHintOrName(entity, labelField, itemHints, itemHintsDistance
     end
 
     local x, y = visualExtent.getTileCenter(entity)
+    -- Reading a field a component lacks errors rather than returning nil, and only the
+    -- AP label carries an offsetX.
+    x = x + (labelField == "AP_hintLabel" and label.offsetX or 0)
     local yOffsetBase = label.offsetY - 8 * adjacentItems
 
     -- Player label should sit just above the item name, not an entire item height above
@@ -128,10 +131,10 @@ event.render.override("renderItemHintLabels", { sequence = 1 }, function(func, e
 
     if itemHints or itemNames then
         for entity in ecs.entitiesWithComponents({
-            "AP_itemHintLabel",
+            "AP_hintLabel",
         }) do
-            if hintsVisibleFor(entity) and entity.AP_itemHintLabel.text ~= "" then
-                renderHintOrName(entity, "AP_itemHintLabel", itemHints, itemHintsDistance, itemNames)
+            if hintsVisibleFor(entity) and entity.AP_hintLabel.text ~= "" then
+                renderHintOrName(entity, "AP_hintLabel", itemHints, itemHintsDistance, itemNames)
             end
         end
 
@@ -139,7 +142,7 @@ event.render.override("renderItemHintLabels", { sequence = 1 }, function(func, e
             "itemHintLabel",
             "visibility"
         }) do
-            if hintsVisibleFor(entity) and not (entity.AP_itemHintLabel and entity.AP_itemHintLabel.text and entity.AP_itemHintLabel.text ~= "") then
+            if hintsVisibleFor(entity) and not (entity.AP_hintLabel and entity.AP_hintLabel.text and entity.AP_hintLabel.text ~= "") then
                 renderHintOrName(entity, "itemHintLabel", itemHints, itemHintsDistance, itemNames)
             end
         end

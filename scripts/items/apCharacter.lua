@@ -24,8 +24,8 @@ event.objectSpawn.add("apCharacterItemSetup", { order = "overrides", filter = { 
     if ev.entity.AP_flyaway then
         ev.entity.AP_flyaway.text = charName .. " Unlocked!"
     end
-    if ev.entity.AP_itemHintLabel then
-        ev.entity.AP_itemHintLabel.text = charName
+    if ev.entity.AP_hintLabel then
+        ev.entity.AP_hintLabel.text = charName
     end
 
     ev.entity.sprite.visible = false

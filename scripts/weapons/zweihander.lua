@@ -68,7 +68,7 @@ customWeapons.registerShape {
     name         = "Zweihander",
     friendlyName = "Zweihänder",
     hint         = "Sweeping attack, heavy",
-    texture      = "mods/AP/gfx/weapons/weapon_zweihander.png",
+    texture      = "mods/AP/gfx/items/weapons/weapon_zweihander.png",
     components   = {
         weapon        = { damage = 1 },
         weaponPattern = { pattern = { tiles = {} } },
@@ -145,7 +145,7 @@ customWeapons.registerShape {
     name             = "GlassZweihanderShard",
     friendlyName     = "Glass Zweihänder Shard",
     hint             = "Sweeping attack, fragile",
-    texture          = "mods/AP/gfx/weapons/weapon_zweihander_shard.png",
+    texture          = "mods/AP/gfx/weapons/items/weapon_zweihander_shard.png",
     includeMaterials = { "Base" },
     components       = {
         weapon        = { damage = 1 },
@@ -188,7 +188,7 @@ customWeapons.registerShape {
         local glassMat = customWeapons.getMaterialData("Glass")
         if glassMat then
             ev.entity.sprite.texture = customWeapons.getTexture(
-                { texture = "mods/AP/gfx/weapons/weapon_zweihander_shard.png" },
+                { texture = "mods/AP/gfx/weapons/items/weapon_zweihander_shard.png" },
                 glassMat
             )
         end
@@ -252,7 +252,7 @@ local function getObsidianGlowTex(level)
     if not (obsMat and obsMat.palette and obsMat.palette[level]) then return nil end
 
     local src = obsMat.palette[level]
-    local args = { image = "mods/AP/gfx/weapons/weapon_zweihander.png" }
+    local args = { image = "mods/AP/gfx/items/weapons/weapon_zweihander.png" }
     for k, v in pairs(src) do
         args[k] = v
     end

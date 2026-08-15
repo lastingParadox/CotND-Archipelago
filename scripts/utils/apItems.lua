@@ -136,7 +136,7 @@ local function getModeObjectData(itemName)
             offsetX = shrineData.offsetX,
             offsetY = shrineData.offsetY,
         },
-        AP_itemHintLabel = {
+        AP_hintLabel = {
             text = mapItem.text,
         },
     }
@@ -247,7 +247,7 @@ function apItems.shopItemToObjectData(item)
         if result.named then
             result.named = nil
             result.args = result.args or {}
-            result.args.AP_itemHintLabel = { text = displayName }
+            result.args.AP_hintLabel = { text = displayName }
             result.args.AP_flyaway = { text = displayName .. " Obtained!" }
         end
     end
@@ -260,7 +260,7 @@ function apItems.shopItemToObjectData(item)
         result.name = "AP_Character"
         result.price = 8
         result.args.AP_character = { name = itemId }
-        result.args.AP_itemHintLabel = { text = displayName }
+        result.args.AP_hintLabel = { text = displayName }
         result.args.AP_flyaway = { text = displayName .. " Unlocked!" }
     end
 

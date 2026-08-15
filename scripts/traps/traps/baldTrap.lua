@@ -1,4 +1,5 @@
 local ecs = require "system.game.Entities"
+local fileio = require "system.game.FileIO"
 local player = require("necro.game.character.Player")
 local hasSkins, SkinReaction = pcall(require, "CharacterSkins.SkinReaction")
 local _, SkinStorage         = pcall(require, "CharacterSkins.SkinStorage")
@@ -6,51 +7,23 @@ local _, SkinStorage         = pcall(require, "CharacterSkins.SkinStorage")
 local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
 local TrapHandler    = require "AP.scripts.traps.trapHandler"
 
-local baldTextureFallback = "mods/AP/gfx/bald/bald_heads.png"
-local baldTextureByChar = {
-    bard     = "mods/AP/gfx/bald/bald_heads_bard.png",
-    bolt     = "mods/AP/gfx/bald/bald_heads_bolt.png",
-    coda     = "mods/AP/gfx/bald/bald_heads_coda.png",
-    diamond  = "mods/AP/gfx/bald/bald_heads_diamond.png",
-    dorian   = "mods/AP/gfx/bald/bald_heads_dorian.png",
-    dove     = "mods/AP/gfx/bald/bald_heads_dove.png",
-    eli      = "mods/AP/gfx/bald/bald_heads_eli.png",
-    monk              = "mods/AP/gfx/bald/bald_heads_monk.png",
-    nocturna          = "mods/AP/gfx/bald/bald_heads_nocturna.png",
-    tempo             = "mods/AP/gfx/bald/bald_heads_tempo.png",
-    coldsteel_coldsteel = "mods/AP/gfx/bald/bald_heads_coldsteel_coldsteel.png",
-    sync_klarinetta   = "mods/AP/gfx/bald/bald_heads_sync_klarinetta.png",
-    sync_suzu         = "mods/AP/gfx/bald/bald_heads_sync_suzu.png",
-}
+local BALD_TEXTURE_PREFIX = "mods/AP/gfx/bald/bald_heads"
+local BALD_TEXTURE_FALLBACK = BALD_TEXTURE_PREFIX .. ".png"
 
--- Characters with rift (supporter) skin bald variants.
-local riftBaldTextureByChar = {
-    cadence   = {
-        normal = "mods/AP/gfx/bald/bald_heads_cadence_rift.png",
-        happy  = "mods/AP/gfx/bald/bald_heads_cadence_rift_happy.png",
-        sad    = "mods/AP/gfx/bald/bald_heads_cadence_rift_sad.png",
-    },
-    dove      = {
-        normal = "mods/AP/gfx/bald/bald_heads_dove_rift.png",
-        happy  = "mods/AP/gfx/bald/bald_heads_dove_rift_happy.png",
-        sad    = "mods/AP/gfx/bald/bald_heads_dove_rift_sad.png",
-    },
-    reaper    = {
-        normal = "mods/AP/gfx/bald/bald_heads_reaper_rift.png",
-        happy  = "mods/AP/gfx/bald/bald_heads_reaper_rift_happy.png",
-        sad    = "mods/AP/gfx/bald/bald_heads_reaper_rift_sad.png",
-    },
-    nocturna  = {
-        normal = "mods/AP/gfx/bald/bald_heads_nocturna_rift.png",
-        happy  = "mods/AP/gfx/bald/bald_heads_nocturna_rift_happy.png",
-        sad    = "mods/AP/gfx/bald/bald_heads_nocturna_rift_sad.png",
-    },
-    sync_suzu = {
-        normal = "mods/AP/gfx/bald/bald_heads_sync_suzu_rift.png",
-        happy  = "mods/AP/gfx/bald/bald_heads_sync_suzu_rift_happy.png",
-        sad    = "mods/AP/gfx/bald/bald_heads_sync_suzu_rift_sad.png",
-    },
-}
+-- Sprites are named after the character, so which ones exist is the only question and
+-- the file itself answers it. Cached: this runs per head on every spawn.
+local baldTextures = {}
+
+local function baldTexture(suffix)
+    local cached = baldTextures[suffix]
+    if cached ~= nil then return cached end
+
+    local path = BALD_TEXTURE_PREFIX .. suffix .. ".png"
+    local texture = fileio.exists(path) and path or false
+    baldTextures[suffix] = texture
+
+    return texture
+end
 
 local baldTrapExceptions = {
     Reaper        = true,
@@ -86,24 +59,25 @@ local function applyBaldToEntity(entity)
     if not (entity and entity.playableCharacter) then return end
     if baldTrapExceptions[entity.name] then return end
     local head = getHeadEntity(entity)
-    if head and head.sprite then
-        local charKey = string.lower(entity.name)
-        local texture
-        if isUsingRiftSkin(entity, head) then
-            local riftTextures = riftBaldTextureByChar[charKey]
-            if riftTextures then
-                local state = entity.CharacterSkins_skinReaction and entity.CharacterSkins_skinReaction.state
-                if state == SkinReaction.State.HAPPY then
-                    texture = riftTextures.happy
-                elseif state == SkinReaction.State.SAD then
-                    texture = riftTextures.sad
-                else
-                    texture = riftTextures.normal
-                end
-            end
+    if not (head and head.sprite) then return end
+
+    local charKey = "_" .. string.lower(entity.name)
+    local texture
+
+    if isUsingRiftSkin(entity, head) then
+        local state = entity.CharacterSkins_skinReaction and entity.CharacterSkins_skinReaction.state
+        local reaction = ""
+
+        if state == SkinReaction.State.HAPPY then
+            reaction = "_happy"
+        elseif state == SkinReaction.State.SAD then
+            reaction = "_sad"
         end
-        head.sprite.texture = texture or baldTextureByChar[charKey] or baldTextureFallback
+
+        texture = baldTexture(charKey .. "_rift" .. reaction) or baldTexture(charKey .. "_rift")
     end
+
+    head.sprite.texture = texture or baldTexture(charKey) or BALD_TEXTURE_FALLBACK
 end
 
 -- sequence 1 runs after CharacterSkins (sequence -1) so the texture isn't overwritten

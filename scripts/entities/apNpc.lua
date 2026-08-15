@@ -1,5 +1,7 @@
 local customEntities = require("necro.game.data.CustomEntities")
 
+local apNpc = {}
+
 local function makeApNpc(name, components)
     components.AP_editorCategory = {}
 
@@ -9,6 +11,8 @@ local function makeApNpc(name, components)
         components = components,
     }
 end
+
+apNpc.make = makeApNpc
 
 makeApNpc("AP_Hintmaster", {
     sprite = {
@@ -41,3 +45,5 @@ makeApNpc("AP_Buffmaster", {
         offsetY = 2
     },
 })
+
+return apNpc

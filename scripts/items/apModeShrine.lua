@@ -66,6 +66,6 @@ event.objectTryCollectItem.add("pickupAPModeShrine", { order = "priceTag", seque
 
     if (ev.item.name == "AP_ModeShrine") then
         if ev.result ~= itemPickup.Result.SUCCESS then return end
-        progression.enableExtraMode(string.gsub(ev.item.AP_itemHintLabel.text, " Mode", ""))
+        progression.enableExtraMode(string.gsub(ev.item.AP_hintLabel.text, " Mode", ""))
     end
 end)
