@@ -23,7 +23,7 @@ local function buildNpcTable(npc_dict)
             }
         end
     else
-        local LOBBY_NPCS = { "Beastmaster", "Merlin", "Hintmaster", "Weaponmaster", "Diamond Dealer" }
+        local LOBBY_NPCS = { "Codex", "Merlin", "Hintmaster", "Janitor", "Diamond Dealer" }
         for _, npc in ipairs(LOBBY_NPCS) do
             result[npc] = { unlocked = true }
         end
@@ -52,18 +52,28 @@ local function convertDeathlinkType(str)
     return t
 end
 
-local function buildPricing(p)
-    p = p or {}
-    local gen = p.general_price_range or {}
-    local fil = p.filler_price_range or {}
-    local use = p.useful_price_range or {}
-    local pro = p.progression_price_range or {}
+-- Slot data sends booleans; 0/1 is still accepted for saves from an older apworld.
+local function isEnabled(value)
+    return value == true or value == 1
+end
+
+-- Flat option table (random_min, filler_max, ...) into the shape getPriceForItem reads.
+local function buildPricing(randomization, ranges)
+    ranges = ranges or {}
+
+    local function bounds(prefix, minDefault, maxDefault)
+        return {
+            min = ranges[prefix .. "_min"] or minDefault,
+            max = ranges[prefix .. "_max"] or maxDefault,
+        }
+    end
+
     return {
-        type        = p.type or 0,
-        general     = { min = gen.min or 1,  max = gen.max or 10 },
-        filler      = { min = fil.min or 1,  max = fil.max or 4  },
-        useful      = { min = use.min or 2,  max = use.max or 8  },
-        progression = { min = pro.min or 4,  max = pro.max or 10 },
+        type        = randomization or apTypes.PriceRandomization.VANILLA,
+        general     = bounds("random", 1, 10),
+        filler      = bounds("filler", 1, 4),
+        useful      = bounds("useful", 2, 8),
+        progression = bounds("progression", 4, 10),
     }
 end
 
@@ -89,6 +99,7 @@ local function applyState(data)
         saveData.goalRequired       = data.goal_required
         -- Resolved by the client, so the spacing rule lives only in the apworld.
         saveData.zoneProgressFloors = arrayToTable(data.zone_progress_floors or { 2 }, true)
+        saveData.speedrunTimes      = data.all_zones_speedrun_times or {}
         saveData.deathlinkType      = convertDeathlinkType(data.death_link_type)
         saveData.deathlinkTrigger   = data.death_link_trigger or "Game Over"
         saveData.enabledDLCs        = arrayToTable(data.dlc, true)
@@ -99,13 +110,16 @@ local function applyState(data)
         end
         saveData.extraModes         = seededModes
         saveData.characterBlacklist = arrayToTable(data.character_blacklist, true)
-        saveData.characterUnlocks   = data.character_unlocks or 0
-        saveData.includeUniqueItems = data.include_unique_items == 1
-        saveData.shrineChecks       = data.include_shrine_checks == 1
-        saveData.chestChecks        = data.include_chest_checks == 1
-        saveData.flawlessChestChecks = data.include_flawless_chest_checks == 1
-        saveData.chestCheckChance   = data.chest_check_chance or 50
-        saveData.zoneAccessKeys     = data.zone_access_keys or 0
+        saveData.characterUnlocks   = data.character_unlocks or "item_only"
+        -- Resolved by the apworld, which is the only side that knows what this slot's DLC
+        -- actually put in the pool.
+        saveData.characterRequirements = data.character_requirements or {}
+        saveData.includeUniqueItems = isEnabled(data.include_unique_items)
+        saveData.shrineChecks       = isEnabled(data.include_shrine_checks)
+        saveData.itemChecks         = (data.items_per_zone or 0) > 0
+        saveData.flawlessChestChecks = isEnabled(data.include_flawless_chest_checks)
+        saveData.itemChance         = data.item_generation_chance or 50
+        saveData.zoneAccessKeys     = data.zone_access_keys or "disabled"
         saveData.startingZone       = data.starting_zone or 1
         local VICTORY_TRIGGER_NAMES = {
             disabled           = "Disabled",
@@ -119,7 +133,7 @@ local function applyState(data)
         saveData.itemRoom           = data.item_room or {}
         saveData.unlockedNPCs       = buildNpcTable(data.caged_npc_locations)
         saveData.npcHintLocations   = data.npc_hint_locations or {}
-        saveData.pricing            = buildPricing(data.pricing)
+        saveData.pricing            = buildPricing(data.price_randomization, data.price_ranges)
     end
 
     apStorage.ensureSaveDataTables()
@@ -159,11 +173,6 @@ handlers.register("State", function(message, ctx)
     end
     applyState(message)
 
-    -- apConnect rebuilds lobby entities (shop slots, victory slot, item room) and
-    -- flips shrine components. Only the host receives State, so firing it in a
-    -- networked session would leave every other client without those changes.
-    -- There the lobby's own generation pass -- gameStateLevel, which all clients
-    -- run -- places them from the state replicated by apStateSync.
     if not apUtils.isNetworked() then
         event.apConnect.fire({ status = "Connected" })
     end

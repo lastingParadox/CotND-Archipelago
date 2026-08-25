@@ -1,6 +1,7 @@
 local ecs = require "system.game.Entities"
 local inventory = require "necro.game.item.Inventory"
 local hasDynChar, _ = pcall(require, "DynChar.DynCharSchema")
+local itemBan = require "necro.game.item.ItemBan"
 local itemPickup = require("necro.game.item.ItemPickup")
 local itemSlot = require "necro.game.item.ItemSlot"
 local settingsStorage = require "necro.config.SettingsStorage"
@@ -39,16 +40,18 @@ end)
 -- Items
 local function addAPItemComponents(entity)
     entity.AP_hintLabel = {}
-    entity.AP_player = {}
-    entity.AP_itemClass = {}
     entity.AP_itemShowcase = {}
     entity.AP_preview = {}
-    entity.AP_shopItem = {}
     entity.AP_locationItem = {}
 end
 
 event.entitySchemaLoadItem.add("addAPComponents", { order = "common", sequence = 1 }, function(ev)
     addAPItemComponents(ev.entity)
+end)
+
+-- Keys free a caged NPC, so a check taking one would strand that unlock.
+event.entitySchemaLoadItem.add("apProtectKeys", { order = "overrides", sequence = 1 }, function(ev)
+    if ev.entity.itemKey then ev.entity.AP_noReplace = {} end
 end)
 
 -- TODO: See why Trident isn't getting these components
@@ -73,24 +76,31 @@ local npcNames = {
     Trainer       = "Codex",
 }
 
-local chestKinds = {
-    ChestRed = "Red",
-    ChestPurple = "Purple",
-    ChestBlack = "Black",
+-- Prototypes a zone item can hide in. Storage-carrying enemies are deliberately absent:
+-- a Leprechaun holding an item is not something the player opens.
+local containers = {
+    ChestRed    = "chest",
+    ChestPurple = "chest",
+    ChestBlack  = "chest",
+    ChestLocked = "chest",
+    Crate       = "crate",
+    Crate2      = "barrel",
+    Crate3      = "urn",
 }
 
 local chestUpgrades = {
-    AddchestRed   = { chest = "ChestRed",    chanceType = "redChest",    order = 1 },
-    AddchestWhite = { chest = "ChestPurple", chanceType = "purpleChest", order = 2 },
-    AddchestBlack = { chest = "ChestBlack",  chanceType = "blackChest",  order = 3 },
+    AddchestRed   = { chest = "ChestRed",    order = 1 },
+    AddchestWhite = { chest = "ChestPurple", order = 2 },
+    AddchestBlack = { chest = "ChestBlack",  order = 3 },
 }
 
 event.entitySchemaLoadEntity.add("apChestSchema", { order = "overrides", sequence = 2 }, function(ev)
     local e = ev.entity
 
-    local kind = chestKinds[e.name]
-    if kind then
-        e.AP_chestKind = { kind = kind }
+    local source = containers[e.name]
+    if source then
+        e.AP_container = { source = source }
+        e.AP_bossRushChest = {}
     end
 
     local upgrade = chestUpgrades[e.name]
@@ -128,11 +138,9 @@ event.entitySchemaLoadEntity.add("playerAPItem", { order = "overrides", sequence
         e.sale = { ["priceTag"] = {} }
 
         e.AP_itemShowcase = {}
-        e.AP_shopItem = {}
-        e.itemHintLabel = {}
-        e.AP_player = {}
+        e.AP_locationItem = {}
+        e.AP_hintLabel = {}
         e.AP_preview = {}
-        e.AP_itemClass = {}
         e.AP_flyaway = {}
         e.itemSlot = { name = "misc" }
         e.inventoryCursedSlots = e.inventoryCursedSlots or {}
@@ -182,10 +190,13 @@ local excludeCharacters = {
 event.entitySchemaLoadNamedEntity.add("apKlarinettaUnbanZweihander", {
     key = "Sync_Klarinetta",
 }, function(ev)
+    -- The mask, not a boolean: FULL also clears the itemGlobalBan her own starting
+    -- Zweihaender now carries. A non-numeric value here would fall back to FULL anyway,
+    -- but only by accident.
     ev.entity.inventoryUnbannedItems = {
         components = {
-            Sync_weaponCollisionCheck  = true,
-            AP_klarinettaWeaponScroll  = true,
+            Sync_weaponCollisionCheck  = itemBan.Type.FULL,
+            AP_klarinettaWeaponScroll  = itemBan.Type.FULL,
         },
     }
 end)
@@ -379,6 +390,26 @@ event.entitySchemaLoadItem.add("apUniqueItemGeneration", { order = "overrides", 
                 e[banComponent] = e[banComponent] or {}
             end
         end
+    end
+end)
+
+-- Golden Lute
+
+event.entitySchemaLoadPlayer.add("apGoldenLuteKeepable", { order = "overrides" }, function(ev)
+    local unbanned = ev.entity.inventoryUnbannedItems
+
+    if not unbanned then
+        unbanned = { components = {} }
+        ev.entity.inventoryUnbannedItems = unbanned
+    end
+
+    unbanned.components = unbanned.components or {}
+    unbanned.components["itemGoldenLute"] = itemBan.Type.USE_ALL
+end)
+
+event.objectTryCollectItem.add("apGoldenLuteIgnoreBans", { order = "ignoreBans" }, function(ev)
+    if ev.item.itemGoldenLute then
+        ev.ignoreBans = true
     end
 end)
 

@@ -7,8 +7,8 @@ local ping = require("necro.client.Ping")
 local player = require("necro.game.character.Player")
 local render = require("necro.render.Render")
 local sound = require("necro.audio.Sound")
-local worldLabel = require("necro.game.system.WorldLabel")
 
+local apInventory = require("AP.scripts.utils.apInventory")
 local apShopSlot = require("AP.scripts.entities.apShopSlot")
 local apTypes = require("AP.scripts.utils.types")
 local progression = require("AP.scripts.client.progression")
@@ -62,10 +62,10 @@ do
     end)
 end
 
-local POTION_SHEET  = "mods/AP/gfx/icons/bonus_potion_indicators.png"
-local POTION_W      = 22
-local POTION_H      = 12
-local POTION_ABOVE  = -13
+local POTION_FULL     = "mods/AP/gfx/icons/potion_indicator.png"
+local POTION_DISABLED = "mods/AP/gfx/icons/potion_disabled_indicator.png"
+local POTION_GAP      = 0   -- px between indicators
+local POTION_ABOVE    = -13 -- px above tile-center Y
 
 customEntities.register({
     name = "AP_BuffPotionDisplay",
@@ -76,31 +76,36 @@ customEntities.register({
     lobbyImmunity = {},
 })
 
--- Mirrors LabelLobby; spawn args cannot add a component the prototype lacks.
-customEntities.register({
-    name = "AP_BuffPotionLabel",
-    position = {},
-    worldLabel = {},
-    worldLabelTextPool = {},
-    worldLabelMaxWidth = {},
-    AP_buffPotionTitle = {},
-})
-
 do
-    local visual = { rect = { 0, 0 }, texRect = { 0, 0, POTION_W, POTION_H }, texture = POTION_SHEET, z = 0 }
+    -- Cache image dimensions on first render frame.
+    local potionW, potionH
+    local visual = { rect = { 0, 0 }, texture = "", z = 0 }
 
     event.render.add("apBuffPotionDisplayRender", { order = "objects" }, function()
+        if not potionW then
+            potionW, potionH = gfx.getImageSize(POTION_FULL)
+            potionW = potionW or 12
+            potionH = potionH or 12
+        end
+
         local buf = render.getBuffer(render.Buffer.HEALTH_BAR)
+        local spacing = potionW + POTION_GAP
 
         for entity in ecs.entitiesWithComponents({ "AP_buffPotionDisplay", "position", "visibility" }) do
             if entity.visibility.visible then
+                local filled = progression.getPotionMode()
+                local total = math.max(1, progression.getPotionTiers())
                 local px, py = render.tileCenter(entity.position.x, entity.position.y)
+                local startX = px - math.ceil((spacing * total - POTION_GAP) / 2) + 1
+                local potionY = py + POTION_ABOVE - potionH
 
-                visual.texRect[1] = progression.getPotionMode() * POTION_W
-                visual.rect[1] = px - math.ceil(POTION_W / 2) + 1
-                visual.rect[2] = py + POTION_ABOVE - POTION_H
                 visual.z = py
-                buf.draw(visual)
+                for i = 0, total - 1 do
+                    visual.rect[1] = startX + i * spacing
+                    visual.rect[2] = potionY
+                    visual.texture = i < filled and POTION_FULL or POTION_DISABLED
+                    buf.draw(visual)
+                end
             end
         end
     end)
@@ -197,13 +202,13 @@ registerVisibleTrigger("AP_TriggerBuffPotionIncrease", "ext/level/TEMP_shop_next
     soundTrapActivate = { sound = "teleport" }
 })
 
+-- A rebuild rather than a stack edit, since lowering the count has to drop potions again.
 local function setPotionMode(ev, mode)
     progression.setPotionMode(mode)
 
-    for entity in ecs.entitiesWithComponents({ "AP_buffPotionTitle", "worldLabel" }) do
-        entity.worldLabel.text = apTypes.PotionModeTitles[mode]
+    for _, playerEntity in ipairs(player.getPlayerEntities()) do
+        apInventory.applyStarterInventory(playerEntity, progression, { sanitize = true })
     end
-    worldLabel.updateAll()
 
     flyaway.create({ entity = ev.trap, text = apTypes.PotionModes[mode] })
 end
@@ -212,7 +217,7 @@ event.trapTrigger.add("apBuffPotionDecrease", { filter = "AP_buffPotionDecrease"
     local current = progression.getPotionMode()
     if current <= 0 then
         sound.playFromEntity("error", ev.trap, { deduplicationID = ev.trap.id })
-        flyaway.create({ entity = ev.trap, text = "Bonus potion already disabled!" })
+        flyaway.create({ entity = ev.trap, text = "Potions already disabled!" })
         return
     end
     setPotionMode(ev, current - 1)

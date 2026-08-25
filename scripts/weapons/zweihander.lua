@@ -12,12 +12,21 @@ local render = require "necro.render.Render"
 local settingsStorage = require "necro.config.SettingsStorage"
 local utils = require "system.utils.Utilities"
 
-event.entitySchemaLoadNamedEntity.add("apZweihanderTransmutable", {
+event.entitySchemaLoadNamedEntity.add("apZweihanderShapeBase", {
     order    = "overrides",
     sequence = 1,
     key      = "Sync_WeaponReallyBigSword",
 }, function(ev)
-    ev.entity.itemTransmutable = {}
+    ev.entity.itemTransmutable          = {}
+    ev.entity.AP_weaponTypeZweihander   = {}
+    ev.entity.weaponType     = { name = "AP_Zweihander", component = "AP_weaponTypeZweihander" }
+    ev.entity.weaponMaterial = { name = "Base", component = "weaponMaterialBase" }
+    ev.entity.weaponMaterialBase = {}
+    ev.entity.spriteSheet    = {}
+    ev.entity.itemPrice      = { coins = 15, blood = 24 }
+    ev.entity.AP_itemPoolChest = { weights = { 10, 25, 5, 0 } }
+    ev.entity.AP_itemPoolShop  = { weights = { 0, 5, 10, 20 } }
+    ev.entity.itemGlobalBan  = { banFlags = itemBan.Type.FULL }
 end)
 
 local ZWEIHANDER_CONTROL_COMPONENTS = {
@@ -52,7 +61,6 @@ local ZWEIHANDER_CONTROL_COMPONENTS = {
 }
 
 local MATERIAL_PRICES = {
-    [""]         = { coins = 15,  blood = 24 },
     ["Glass"]    = { coins = 40,  blood = 24 },
     ["Blood"]    = { coins = 40,  blood = 24 },
     ["Frost"]    = { coins = 60,  blood = 24 },
@@ -64,80 +72,87 @@ local MATERIAL_PRICES = {
     ["Jeweled"]  = { coins = 120, blood = 24 },
 }
 
+-- Mirrors Sync_WeaponReallyBigSword's deployed-sword behaviour; both shapes below are
+-- that weapon in a different material.
+local DEPLOYED_SWORD_COMPONENTS = {
+    weapon        = { damage = 1 },
+    weaponPattern = { pattern = { tiles = {} } },
+    team          = {},
+    DynChar_dynamicItem   = false,
+    facingDirection       = {},
+    positionalSprite      = { offsetX = -2, offsetY = -2 },
+    minimapStaticPixel    = false,
+    Sync_deployedItemAttachment = {
+        width = 30, height = 30,
+        offsetX = 26, offsetY = 22, offsetZ = 32,
+        absOffsetX = math.sqrt(2) / 2 - 1.05,
+        frameCount = 1, rotate = true,
+        angleOffset = math.pi * 3 / 4,
+    },
+    Sync_deployedItemAttachmentHover    = { offset = 5.9 + math.sqrt(2) / 2, amplitude = -1 },
+    Sync_deployedItemInvisibleWhileHeld = {},
+    itemTangibleWhileEquipped           = {},
+    itemRequireTangibleHolder           = {},
+    itemEquipmentCollision              = { remove = collision.Type.ITEM },
+    Sync_deployedItem                   = {},
+    Sync_deployedItemFollowHolder       = {},
+    Sync_deployedItemCopyHolderTeam     = {},
+    Sync_weaponCollisionCheck           = {},
+    collision = { mask = collision.mask(collision.Type.FAMILIAR, collision.Type.ITEM) },
+    Sync_deployedItemIdleCollision      = { add = collision.Type.ORB, remove = collision.Type.FAMILIAR },
+    castOnCollision                     = { spell = "Sync_DelayedClaymoreAttack" },
+    Sync_deployedItemAttackDeferred     = {},
+    Sync_deployedItemAttackTargetCounter = {},
+    Sync_deployedItemRotatable          = {},
+    Sync_deployedItemAttackOnMove       = {},
+    Sync_deployedItemAttackOnMoveFail   = {
+        pattern = { tiles = { { offset = {1, 0}, swipe = "dagger" } } },
+    },
+    Sync_deployedItemAttackOnRotate     = {},
+    itemGlobalBan                       = { banFlags = itemBan.Type.FULL },
+}
+
+local function swordComponents(extra)
+    return utils.mergeTablesRecursive(utils.deepCopy(DEPLOYED_SWORD_COMPONENTS), extra or {})
+end
+
+local function applyControlScheme(entity)
+    local controlVal = settingsStorage.get("mod.Sync.zweihaender.zweihaender.control") or 6
+    local comps = ZWEIHANDER_CONTROL_COMPONENTS[controlVal]
+    if comps then
+        utils.mergeTablesRecursive(entity, comps)
+    end
+end
+
 customWeapons.registerShape {
     name         = "Zweihander",
     friendlyName = "Zweihänder",
     hint         = "Sweeping attack, heavy",
     texture      = "mods/AP/gfx/items/weapons/weapon_zweihander.png",
-    components   = {
-        weapon        = { damage = 1 },
-        weaponPattern = { pattern = { tiles = {} } },
-        team          = {},
-        DynChar_dynamicItem   = false,
-        facingDirection       = {},
-        positionalSprite      = { offsetX = -2, offsetY = -2 },
-        minimapStaticPixel    = false,
-        Sync_deployedItemAttachment = {
-            width = 30, height = 30,
-            offsetX = 26, offsetY = 22, offsetZ = 32,
-            absOffsetX = math.sqrt(2) / 2 - 1.05,
-            frameCount = 1, rotate = true,
-            angleOffset = math.pi * 3 / 4,
-        },
-        Sync_deployedItemAttachmentHover  = { offset = 5.9 + math.sqrt(2) / 2, amplitude = -1 },
-        Sync_deployedItemInvisibleWhileHeld = {},
-        itemTangibleWhileEquipped         = {},
-        itemRequireTangibleHolder          = {},
-        itemEquipmentCollision            = { remove = collision.Type.ITEM },
-        Sync_deployedItem                 = {},
-        Sync_deployedItemFollowHolder     = {},
-        Sync_deployedItemCopyHolderTeam   = {},
-        Sync_weaponCollisionCheck         = {},
-        collision = { mask = collision.mask(collision.Type.FAMILIAR, collision.Type.ITEM) },
-        Sync_deployedItemIdleCollision    = { add = collision.Type.ORB, remove = collision.Type.FAMILIAR },
-        castOnCollision                   = { spell = "Sync_DelayedClaymoreAttack" },
-        Sync_deployedItemAttackDeferred   = {},
-        Sync_deployedItemAttackTargetCounter = {},
-        Sync_deployedItemRotatable        = {},
-        Sync_deployedItemAttackOnMove     = {},
-        Sync_deployedItemAttackOnMoveFail = {
-            pattern = { tiles = { { offset = {1, 0}, swipe = "dagger" } } },
-        },
-        Sync_deployedItemAttackOnRotate   = {},
+    -- Sync_WeaponReallyBigSword is the Base member, stamped above.
+    excludeMaterials = { "Base" },
+    components   = swordComponents {
         AP_itemPoolChest = { weights = { 10, 25, 5, 0 } },
         AP_itemPoolShop  = { weights = { 0, 5, 10, 20 } },
         itemPrice        = { coins = 90, blood = 24 },
         itemTransmutable = {},
         spriteSheet      = {}, -- needed by groove chain sprite palette-frame shifts
-        itemGlobalBan    = { banFlags = itemBan.Type.FULL },
     },
     modifier = function(ev)
         local matName = ev.material and ev.material.shortName or ""
 
-        if matName == "" then
-            ev.entity.sprite.texture = "mods/Sync/gfx/item/weapon_greatsword.png"
-            ev.entity.sprite.width  = 28
-            ev.entity.sprite.height = 28
-            ev.entity.Sync_deployedItemAttachment.width  = 28
-            ev.entity.Sync_deployedItemAttachment.height = 28
-        else
-            ev.entity.sprite.width  = 30
-            ev.entity.sprite.height = 30
-            ev.entity.AP_itemPoolEnchant = { weights = { 1 } }
+        ev.entity.sprite.width  = 30
+        ev.entity.sprite.height = 30
+        ev.entity.AP_itemPoolEnchant = { weights = { 1 } }
 
-            if matName == "Glass" then
-                ev.entity.consumableCreateDroppedItem = { itemType = "AP_WeaponGlassZweihanderShard" }
-            end
+        if matName == "Glass" then
+            ev.entity.consumableCreateDroppedItem = { itemType = "AP_WeaponGlassZweihanderShard" }
         end
 
         ev.entity.itemPrice = MATERIAL_PRICES[matName] or { coins = 90, blood = 24 }
         ev.entity.itemUnlockable = false
 
-        local controlVal = settingsStorage.get("mod.Sync.zweihaender.zweihaender.control") or 6
-        local comps = ZWEIHANDER_CONTROL_COMPONENTS[controlVal]
-        if comps then
-            utils.mergeTablesRecursive(ev.entity, comps)
-        end
+        applyControlScheme(ev.entity)
     end,
 }
 
@@ -145,50 +160,14 @@ customWeapons.registerShape {
     name             = "GlassZweihanderShard",
     friendlyName     = "Glass Zweihänder Shard",
     hint             = "Sweeping attack, fragile",
-    texture          = "mods/AP/gfx/weapons/items/weapon_zweihander_shard.png",
+    texture          = "mods/AP/gfx/items/weapons/weapon_zweihander_shard.png",
     includeMaterials = { "Base" },
-    components       = {
-        weapon        = { damage = 1 },
-        weaponPattern = { pattern = { tiles = {} } },
-        team          = {},
-        DynChar_dynamicItem   = false,
-        facingDirection       = {},
-        positionalSprite      = { offsetX = -2, offsetY = -2 },
-        minimapStaticPixel    = false,
-        Sync_deployedItemAttachment = {
-            width = 30, height = 30,
-            offsetX = 26, offsetY = 22, offsetZ = 32,
-            absOffsetX = math.sqrt(2) / 2 - 1.05,
-            frameCount = 1, rotate = true,
-            angleOffset = math.pi * 3 / 4,
-        },
-        Sync_deployedItemAttachmentHover  = { offset = 5.9 + math.sqrt(2) / 2, amplitude = -1 },
-        Sync_deployedItemInvisibleWhileHeld = {},
-        itemTangibleWhileEquipped         = {},
-        itemRequireTangibleHolder         = {},
-        itemEquipmentCollision            = { remove = collision.Type.ITEM },
-        Sync_deployedItem                 = {},
-        Sync_deployedItemFollowHolder     = {},
-        Sync_deployedItemCopyHolderTeam   = {},
-        Sync_weaponCollisionCheck         = {},
-        collision = { mask = collision.mask(collision.Type.FAMILIAR, collision.Type.ITEM) },
-        Sync_deployedItemIdleCollision    = { add = collision.Type.ORB, remove = collision.Type.FAMILIAR },
-        castOnCollision                   = { spell = "Sync_DelayedClaymoreAttack" },
-        Sync_deployedItemAttackDeferred   = {},
-        Sync_deployedItemAttackTargetCounter = {},
-        Sync_deployedItemRotatable        = {},
-        Sync_deployedItemAttackOnMove     = {},
-        Sync_deployedItemAttackOnMoveFail = {
-            pattern = { tiles = { { offset = {1, 0}, swipe = "dagger" } } },
-        },
-        Sync_deployedItemAttackOnRotate   = {},
-        itemGlobalBan    = { banFlags = itemBan.Type.FULL },
-    },
+    components       = swordComponents(),
     modifier = function(ev)
         local glassMat = customWeapons.getMaterialData("Glass")
         if glassMat then
             ev.entity.sprite.texture = customWeapons.getTexture(
-                { texture = "mods/AP/gfx/weapons/items/weapon_zweihander_shard.png" },
+                { texture = "mods/AP/gfx/items/weapons/weapon_zweihander_shard.png" },
                 glassMat
             )
         end
@@ -196,16 +175,14 @@ customWeapons.registerShape {
         ev.entity.sprite.height  = 30
         ev.entity.itemUnlockable = false
 
-        local controlVal = settingsStorage.get("mod.Sync.zweihaender.zweihaender.control") or 6
-        local comps = ZWEIHANDER_CONTROL_COMPONENTS[controlVal]
-        if comps then utils.mergeTablesRecursive(ev.entity, comps) end
+        applyControlScheme(ev.entity)
     end,
 }
 
+-- Sync_weaponCollisionCheck is carried only by the Zweihaender family, so it needs no
+-- accompanying name test.
 event.inventoryEquipItem.add("APZweihanderPickUp", { order = "equip" }, function(ev)
-    if ev.item.Sync_weaponCollisionCheck
-        and ev.item.name and ev.item.name:find("Zweihander", 1, true)
-        and ev.holder.name ~= "Sync_Klarinetta" then
+    if ev.item.Sync_weaponCollisionCheck and ev.holder.name ~= "Sync_Klarinetta" then
         ev.holder.inputContextLayerDiagonal       = {}
         ev.holder.inventoryVirtualControlsHintHUD = {}
         ev.holder.actionRemap                     = {}

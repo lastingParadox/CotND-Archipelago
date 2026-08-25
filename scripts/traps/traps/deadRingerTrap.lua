@@ -15,7 +15,7 @@ local function deadRingerTrap(ev)
     local affectedPlayers = {}
 
     -- Collect all valid affected players
-    for _, entry in ipairs(ev.actionQueue) do
+    for _, entry in ipairs(TrapHandler.actingEntries(ev)) do
         if not entry.entity or
             not entry.entity.playableCharacter or
             (entry.entity.confusable and entry.entity.confusable.remainingTurns > 0) then

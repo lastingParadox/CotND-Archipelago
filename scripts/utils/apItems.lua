@@ -1,6 +1,7 @@
 local ecs = require "system.game.Entities"
 local extraMode = require "necro.game.data.modifier.ExtraMode"
 local gfx = require "system.gfx.GFX"
+local utils = require "system.utils.Utilities"
 
 local apCharacters = require("AP.scripts.utils.apCharacters")
 local types = require("AP.scripts.utils.types")
@@ -18,6 +19,18 @@ apItems.apItemsList = {
     ["APDiamond3"] = true,
     ["APDiamond4"] = true,
     ["APFullHeal"] = true,
+    ["APSparePotion"] = true,
+    ["APSpareCoupon"] = true,
+    ["APBomb"] = true,
+    ["APBomb3"] = true,
+    ["APBombGrenade"] = true,
+    ["APScrollNeed"] = true,
+    ["APScrollDescend"] = true,
+    ["APHeartTransplant"] = true,
+    ["APRandomItem"] = true,
+    ["APRandomShrine"] = true,
+    ["APCharmedEscort"] = true,
+    ["APFireSale"] = true,
     ["APNoReturnMode"] = true,
     ["APHardMode"] = true,
     ["APPhasingMode"] = true,
@@ -34,10 +47,10 @@ apItems.apItemsList = {
     ["APZone5Access"] = true,
     ["APProgressiveZoneAccess"] = true,
     ["APProgressivePotions"] = true,
+    ["APProgressiveCoinMultiplier"] = true,
     ["APCharRoomKey"] = true,
     ["APGoldenLuteShard"] = true,
 }
-
 
 apItems.isTrapItem = function(item)
     return string.find(item, "Trap") ~= nil
@@ -48,8 +61,14 @@ apItems.isOwnShopItem = function(item, slotName)
         tonumber(item.location_code) >= shopLocationRange[1] and tonumber(item.location_code) <= shopLocationRange[2]
 end
 
+-- Whether the entity standing in for this AP item is one the player collects in person,
+-- rather than a carrier that hands the effect over and is deleted.
 apItems.isPhysicalItem = function(itemId)
     if not itemId or itemId == "" then return false end
+
+    local entry = apItems.entityMap[itemId]
+    if entry then return entry.physical == true end
+
     if apItems.isTrapItem(itemId) then return false end
     if apItems.apItemsList[itemId] then return false end
     if apCharacters.isCharacter(itemId) or apCharacters.isNPC(itemId) then return false end
@@ -142,13 +161,87 @@ local function getModeObjectData(itemName)
     }
 end
 
+-- Shrine entities cannot be picked up, so a chest or shop holding one would offer a
+-- check the player has no way to take.
+local function getShrineObjectData(itemName, displayName)
+    local proto = itemName and ecs.getEntityPrototype(itemName)
+    if not (proto and proto.shrine and proto.sprite) then return nil end
+
+    local data = {
+        sprite = {
+            texture = proto.sprite.texture,
+            width = proto.sprite.width,
+            height = proto.sprite.height,
+        },
+        spriteSheet = { frameX = 1, frameY = 1 },
+        AP_hintLabel = { text = displayName },
+    }
+
+    if proto.positionalSprite then
+        data.positionalSprite = {
+            offsetX = proto.positionalSprite.offsetX,
+            offsetY = proto.positionalSprite.offsetY,
+        }
+    end
+
+    return data
+end
+
 local GOLD_VALUES = {
     APInstantGold = 50,
     APInstantGold2 = 200,
 }
 
--- Classification flags combine, so they are tested as bits rather than matched
--- as values: AP's progression_skip_balancing is 9, not a class of its own.
+-- The entity that stands in for each AP item, and what the lobby shop charges for it.
+apItems.entityMap = {
+    APDiamond1 = { name = "AP_ResourceDiamond1", price = 1 },
+    APDiamond2 = { name = "AP_ResourceDiamond2", price = 2 },
+    APDiamond3 = { name = "AP_ResourceDiamond3", price = 3 },
+    APDiamond4 = { name = "AP_ResourceDiamond4", price = 4 },
+    APFullHeal = { name = "AP_FullHeal", price = 1 },
+    APSparePotion = { name = "AP_SparePotion", price = 2 },
+    APRandomItem = { name = "AP_RandomItem", price = 3 },
+    APRandomShrine = { name = "AP_RandomShrine", price = 3 },
+    APCharmedEscort = { name = "AP_CharmedEscort", price = 3 },
+    APFireSale = { name = "AP_FireSale", price = 3 },
+
+    APBomb = { name = "Bomb", price = 1, physical = true },
+    APBomb3 = { name = "Bomb3", price = 2, physical = true },
+    APBombGrenade = { name = "BombGrenade", price = 2, physical = true },
+    APSpareCoupon = { name = "MiscCoupon", price = 2, physical = true },
+    APScrollNeed = { name = "ScrollNeed", price = 3, physical = true },
+    APScrollDescend = { name = "ScrollDescend", price = 3, physical = true },
+    APHeartTransplant = { name = "HeartTransplant", price = 4, physical = true },
+
+    APShopStock = { name = "AP_ShopStock", price = 1 },
+    APProgressivePotions = { name = "AP_ProgressivePotions", price = 2 },
+    APProgressiveCoinMultiplier = { name = "AP_ProgressiveCoinMultiplier", price = 2 },
+    APGoldenLuteShard = { name = "AP_GoldenLuteShard", price = 4, named = true },
+
+    -- Vanilla names these "Per Run", so the apworld's name is the honest one and has to
+    -- override the prototype's own label.
+    AddchestRed = { name = "AddchestRed", price = 1, named = true, physical = true },
+    AddchestWhite = { name = "AddchestWhite", price = 1, named = true, physical = true },
+    AddchestBlack = { name = "AddchestBlack", price = 1, named = true, physical = true },
+
+    APProgressiveZoneAccess = { name = "AP_ProgressiveZoneAccess", price = 1 },
+    APZone1Access = { name = "AP_Zone1Access", price = 1 },
+    APZone2Access = { name = "AP_Zone2Access", price = 1 },
+    APZone3Access = { name = "AP_Zone3Access", price = 1 },
+    APZone4Access = { name = "AP_Zone4Access", price = 1 },
+    APZone5Access = { name = "AP_Zone5Access", price = 1 },
+    APCharRoomKey = { name = "AP_CharRoomKey", price = 1 },
+}
+
+for gold, value in pairs(GOLD_VALUES) do
+    apItems.entityMap[gold] = {
+        name = "AP_Gold",
+        price = 1,
+        named = true,
+        args = { AP_currency = { value = value } },
+    }
+end
+
 local CLASSIFICATIONS = {
     { flag = 4, name = "trap" },
     { flag = 1, name = "progression" },
@@ -163,8 +256,6 @@ function apItems.itemClassName(classification)
     return "filler"
 end
 
--- Someone else's item has no CotND entity of its own, so it stands in as a
--- placeholder drawn by how their world classified it.
 local FOREIGN_ITEM_ENTITIES = {
     filler = "AP_ItemFiller",
     progression = "AP_ItemProgression",
@@ -181,6 +272,7 @@ function apItems.shopItemToObjectData(item)
 
     -- Check if it's a mode shrine
     local modeObjectData = getModeObjectData(itemId)
+    local shrineObjectData = getShrineObjectData(itemId, displayName)
 
     if modeObjectData.sprite then
         modeObjectData.sprite.texture = modeObjectData.sprite.texture or "gfx/placeholder.png"
@@ -188,6 +280,12 @@ function apItems.shopItemToObjectData(item)
             name = "AP_ModeShrine",
             price = 8,
             args = modeObjectData
+        }
+    elseif shrineObjectData then
+        result = {
+            name = "AP_ModeShrine",
+            price = 8,
+            args = shrineObjectData
         }
     elseif apItems.isTrapItem(itemId) then
         result = {
@@ -201,47 +299,15 @@ function apItems.shopItemToObjectData(item)
         }
     else
         -- Static items
-        local map = {
-            APDiamond1 = { name = "AP_ResourceDiamond1", price = 1 },
-            APDiamond2 = { name = "AP_ResourceDiamond2", price = 2 },
-            APDiamond3 = { name = "AP_ResourceDiamond3", price = 3 },
-            APDiamond4 = { name = "AP_ResourceDiamond4", price = 4 },
-            APFullHeal = { name = "AP_FullHeal", price = 1 },
-            APShopStock = { name = "AP_ShopStock", price = 1 },
-            APProgressivePotions = { name = "AP_ProgressivePotions", price = 2 },
-            APGoldenLuteShard = { name = "AP_GoldenLuteShard", price = 4, named = true },
+        -- APItem is the only entry that depends on the scout, so it is built per call.
+        local entry = itemId == "APItem" and {
+            name = FOREIGN_ITEM_ENTITIES[apItems.itemClassName(item["Classification"])],
+            price = 1,
+            named = true,
+        } or apItems.entityMap[itemId]
 
-            APItem = {
-                name = FOREIGN_ITEM_ENTITIES[apItems.itemClassName(item["Classification"])],
-                price = 1,
-                named = true,
-            },
-
-            -- Vanilla names these "Per Run", so the apworld's name is the honest
-            -- one and has to override the prototype's own label.
-            AddchestRed = { name = "AddchestRed", price = 1, named = true },
-            AddchestWhite = { name = "AddchestWhite", price = 1, named = true },
-            AddchestBlack = { name = "AddchestBlack", price = 1, named = true },
-
-            APProgressiveZoneAccess = { name = "AP_ProgressiveZoneAccess", price = 1 },
-            APZone1Access = { name = "AP_Zone1Access", price = 1 },
-            APZone2Access = { name = "AP_Zone2Access", price = 1 },
-            APZone3Access = { name = "AP_Zone3Access", price = 1 },
-            APZone4Access = { name = "AP_Zone4Access", price = 1 },
-            APZone5Access = { name = "AP_Zone5Access", price = 1 },
-            APCharRoomKey = { name = "AP_CharRoomKey", price = 1 },
-        }
-
-        for gold, value in pairs(GOLD_VALUES) do
-            map[gold] = {
-                name = "AP_Gold",
-                price = 1,
-                named = true,
-                args = { AP_currency = { value = value } },
-            }
-        end
-
-        result = map[itemId] or { name = itemId, price = 1 }
+        -- Copied: `named` is stripped off whatever this returns and `args` is written into.
+        result = entry and utils.deepCopy(entry) or { name = itemId, price = 1 }
 
         -- Carriers share a prototype, so the shop name and flyaway are per-item.
         if result.named then
@@ -253,8 +319,10 @@ function apItems.shopItemToObjectData(item)
     end
 
     result.args = result.args or {}
-    result.args.AP_player = { name = item["PlayerName"] or "" }
-    result.args.AP_itemClass = { classification = item["Classification"] or 0 }
+    result.args.AP_locationItem = {
+        player = item["PlayerName"] or "",
+        classification = item["Classification"] or 0,
+    }
 
     if apCharacters.isCharacter(itemId) or apCharacters.isNPC(itemId) then
         result.name = "AP_Character"

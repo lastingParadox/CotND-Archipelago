@@ -1,5 +1,4 @@
 local collision = require("necro.game.tile.Collision")
-local color = require("system.utils.Color")
 local ecs = require("system.game.Entities")
 local focus = require("necro.game.character.Focus")
 local map = require "necro.game.object.Map"
@@ -9,17 +8,8 @@ local ui = require("necro.render.UI")
 local utils = require("system.utils.Utilities")
 local visualExtent = require("necro.render.level.VisualExtent")
 
-local apItems = require("AP.scripts.utils.apItems")
+local apColors = require("AP.scripts.utils.apColors")
 local progression = require("AP.scripts.client.progression")
-
-local colors = {
-    filler      = color.rgb(125, 238, 238),
-    progression = color.rgb(175, 153, 239),
-    useful      = color.rgb(105, 134, 223),
-    trap        = color.rgb(250, 128, 114),
-}
-
-local playerColor = color.rgb(238, 125, 238)
 
 local function isFocusedEntityClose(entity, itemHintsDistance)
     for _, focusedEntity in ipairs(focus.getAll(focus.Flag.TEXT_LABEL)) do
@@ -39,7 +29,7 @@ end
 local function renderText(args)
     args.buffer = args.buffer or render.Buffer.TEXT_LABEL
     args.font = args.font or ui.Font.SMALL
-    args.fillColor = args.fillColor or color.rgb(255, 255, 255)
+    args.fillColor = args.fillColor or apColors.WHITE
     args.z = args.z or args.y - 48
     args.alignX = 0.5
     args.alignY = args.alignY or 1
@@ -69,49 +59,44 @@ local function renderHintOrName(entity, labelField, itemHints, itemHintsDistance
     end
 
     local slotName = progression.getPlayerName()
-    local hasPlayerLabel = entity.AP_player
-        and entity.AP_player.name ~= ""
-        and entity.AP_player.name ~= slotName
+    local function ownedByAnother(item)
+        return item and item.AP_locationItem
+            and item.AP_locationItem.player ~= ""
+            and item.AP_locationItem.player ~= slotName
+    end
+
+    local hasPlayerLabel = ownedByAnother(entity)
 
     -- Account for neighboring AP items (so full label blocks don't collide)
     for dx = 1, adjacentItems do
-        local leftEntityID = map.firstWithComponent(entity.position.x - dx, entity.position.y, "AP_player")
-        if leftEntityID then
-            local leftEntity = ecs.getEntityByID(leftEntityID)
-            if leftEntity
-                and leftEntity.AP_player
-                and leftEntity.AP_player.name ~= ""
-                and leftEntity.AP_player.name ~= slotName
-            then
-                adjacentItems = adjacentItems + 1
-            end
+        local left = map.firstWithComponent(entity.position.x - dx, entity.position.y, "AP_locationItem")
+        if ownedByAnother(left) then
+            adjacentItems = adjacentItems + 1
         end
     end
 
     local x, y = visualExtent.getTileCenter(entity)
-    -- Reading a field a component lacks errors rather than returning nil, and only the
-    -- AP label carries an offsetX.
     x = x + (labelField == "AP_hintLabel" and label.offsetX or 0)
     local yOffsetBase = label.offsetY - 8 * adjacentItems
 
     -- Player label should sit just above the item name, not an entire item height above
-    local PLAYER_LABEL_GAP = 7 -- tighter spacing within same item
+    local PLAYER_LABEL_GAP = 7
 
     if hasPlayerLabel then
         renderText({
-            text = entity.AP_player.name .. "'s",
+            text = entity.AP_locationItem.player .. "'s",
             x = x,
             y = y + yOffsetBase - PLAYER_LABEL_GAP,
-            fillColor = playerColor,
+            fillColor = apColors.player,
             buffer = render.Buffer.TEXT_LABEL_FRONT
         })
     end
-    local colorVar = entity.AP_itemClass
-        and colors[apItems.itemClassName(entity.AP_itemClass.classification)]
-        or color.rgb(255, 255, 255)
+    local colorVar = entity.AP_locationItem
+        and apColors.forClassification(entity.AP_locationItem.classification)
+        or apColors.WHITE
 
     if not hasPlayerLabel then
-        colorVar = color.rgb(255, 255, 255)
+        colorVar = apColors.WHITE
     end
 
     return renderText({

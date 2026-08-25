@@ -7,7 +7,7 @@ local _, SkinStorage         = pcall(require, "CharacterSkins.SkinStorage")
 local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
 local TrapHandler    = require "AP.scripts.traps.trapHandler"
 
-local BALD_TEXTURE_PREFIX = "mods/AP/gfx/bald/bald_heads"
+local BALD_TEXTURE_PREFIX = "mods/AP/gfx/entities/bald/bald_heads"
 local BALD_TEXTURE_FALLBACK = BALD_TEXTURE_PREFIX .. ".png"
 
 -- Sprites are named after the character, so which ones exist is the only question and

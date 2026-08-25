@@ -1,4 +1,5 @@
 local controls = require("necro.config.Controls")
+local currentLevel = require("necro.game.level.CurrentLevel")
 local cutscene = require("necro.client.Cutscene")
 local fileIO = require("system.game.FileIO")
 local music = require("necro.audio.Music")
@@ -10,7 +11,9 @@ local stateControl = require("necro.client.StateControl")
 local turn = require("necro.cycles.Turn")
 
 local apFlyaways = require("AP.scripts.ui.apFlyaways")
+local apLog = require("AP.scripts.utils.log").apLog
 local apReplay = require("AP.scripts.utils.apReplay")
+local apUtils = require("AP.scripts.utils.apUtils")
 local TrapHandler = require("AP.scripts.traps.trapHandler")
 
 local REPLAY_KEY = "cutsceneTrap"
@@ -44,7 +47,6 @@ local KNOWN_STORIES = {
 
 local storyPool = nil
 local trapCutsceneActive = false
-local trapCutscenePendingSuccess = false
 local shouldFadeInMusicOnUnpause = false
 
 -- sequence = -1 runs before the built-in "cutscene" handler so we consume inputs first
@@ -77,43 +79,50 @@ end
 
 local clearOverridePending = false
 
+local function announce()
+    for _, entity in ipairs(player.getPlayerEntities()) do
+        if not (entity and entity.playableCharacter) then goto continue end
+        apFlyaways.addToFlyawayQueue({ entity = entity, text = "Cutscene!" })
+        ::continue::
+    end
+end
+
 event.cutsceneEnd.add("APCutsceneTrapClearOverride", { order = "cutscene" }, function()
     if clearOverridePending then
         clearOverridePending = false
         trapCutsceneActive = false
-        trapCutscenePendingSuccess = true
         shouldFadeInMusicOnUnpause = true
         settingsStorage.set("video.cutscene.displayModeStory", nil, settings.Layer.SCRIPT_OVERRIDE)
         stateControl.unpauseBeats()
+        announce()
     end
 end)
 
-local function cutsceneTrap(ev)
-    if apReplay.seen(REPLAY_KEY) then return true end
+local function cutsceneTrap(ev, args, ticket)
+    local replayKey = REPLAY_KEY .. ":" .. tostring(ticket)
 
-    if trapCutscenePendingSuccess then
-        trapCutscenePendingSuccess = false
-        for _, entity in ipairs(player.getPlayerEntities()) do
-            if not (entity and entity.playableCharacter) then goto continue end
-            apFlyaways.addToFlyawayQueue({ entity = entity, text = "Cutscene!" })
-            ::continue::
-        end
-        apReplay.mark(REPLAY_KEY)
-        return true
+    -- One screening at a time; the rest of the queue waits this one out. A replayed turn
+    -- has to reclaim the entry it already spent, which is what the ticket is for.
+    if trapCutsceneActive or cutscene.isActive() then
+        return apReplay.seen(replayKey)
     end
 
-    if trapCutsceneActive then
-        return false
-    end
+    if not apReplay.firstThisTurn(replayKey) then return true end
 
     if storyPool == nil then
         storyPool = buildStoryPool()
     end
 
-    local channel = rng.makeChannel(turn.getCurrentTurnID())
+    local channel = apUtils.hashChannel(
+        "cutsceneTrap",
+        tostring(currentLevel.getSeed()),
+        tostring(turn.getCurrentTurnID())
+    )
 
     if #storyPool > 0 then
         local entry = rng.choice(storyPool, channel)
+        apLog(("Cutscene trap picked %s_%d of %d"):format(entry.character, entry.index, #storyPool))
+
         local scene = {
             type      = cutscene.Type.STORY,
             character = entry.character,
@@ -127,7 +136,8 @@ local function cutsceneTrap(ev)
         cutscene.play(scene)
         stateControl.pauseWithoutMenu()
 
-        return false
+        -- The screening is this entry's whole job; cutsceneEnd announces it.
+        return true
     else
         cutscene.play({
             type     = cutscene.Type.SPLASH,
@@ -135,15 +145,10 @@ local function cutsceneTrap(ev)
             duration = 5,
         })
 
-        local trapSuccess = false
-        for _, entity in ipairs(player.getPlayerEntities()) do
-            if not (entity and entity.playableCharacter) then goto continue end
-            apFlyaways.addToFlyawayQueue({ entity = entity, text = "Cutscene!" })
-            trapSuccess = true
-            ::continue::
-        end
-        if trapSuccess then apReplay.mark(REPLAY_KEY) end
-        return trapSuccess
+        -- No override to unwind and no pause to lift, so no cutsceneEnd work to wait for.
+        announce()
+
+        return true
     end
 end
 

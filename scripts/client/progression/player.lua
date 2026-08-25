@@ -1,4 +1,5 @@
 local currency = require "necro.game.item.Currency"
+local currentLevel = require "necro.game.level.CurrentLevel"
 local player = require "necro.game.character.Player"
 
 local apFlags = require("AP.scripts.utils.flags")
@@ -16,6 +17,23 @@ local function syncDiamondCurrency()
 end
 
 local function attach(progression)
+    function progression.grantGold(amount)
+        -- A shared pool ignores the entity, so paying per player pays once per head.
+        if currency.isShared(currency.Type.GOLD) then
+            currency.add(nil, currency.Type.GOLD, amount)
+            return
+        end
+
+        local entities = player.getPlayerEntities()
+        if currentLevel.isLobby() then
+            entities = { entities[1] }
+        end
+
+        for _, entity in ipairs(entities) do
+            if entity then currency.add(entity, currency.Type.GOLD, amount) end
+        end
+    end
+
     function progression.getDiamonds()
         return apStorage.saveData.diamonds or 0
     end
@@ -39,9 +57,18 @@ local function attach(progression)
         return math.min(progression.getReceivedCount("APProgressivePotions"), 3)
     end
 
+    function progression.getCoinMultiplierTier()
+        return math.min(progression.getReceivedCount("APProgressiveCoinMultiplier"), 2)
+    end
+
     function progression.getPotionMode()
-        local buffs = apStorage.saveData.buffs or {}
-        return math.min(buffs.potionMode or 0, progression.getPotionTiers())
+        if not apStorage.saveData.buffs then
+            apStorage.saveData.buffs = {}
+        end
+        if apStorage.saveData.buffs.potionMode == nil then
+            apStorage.saveData.buffs.potionMode = progression.getPotionTiers()
+        end
+        return math.min(apStorage.saveData.buffs.potionMode, progression.getPotionTiers())
     end
 
     function progression.setPotionMode(mode)
@@ -49,6 +76,14 @@ local function attach(progression)
             apStorage.saveData.buffs = {}
         end
         apStorage.saveData.buffs.potionMode = math.max(0, math.min(mode, progression.getPotionTiers()))
+        apStorage.sendChangeBuffs()
+    end
+
+    -- Raises an explicitly configured count alongside a newly received tier.
+    function progression.addPotionTier()
+        local buffs = apStorage.saveData.buffs
+        if not buffs or buffs.potionMode == nil then return end
+        buffs.potionMode = math.max(0, math.min(buffs.potionMode + 1, progression.getPotionTiers()))
         apStorage.sendChangeBuffs()
     end
 
@@ -65,8 +100,6 @@ local function attach(progression)
         end
 
         -- If buffs.health has been explicitly configured, shift it by the same delta
-        -- so that newly earned hearts add to the player's chosen value rather than
-        -- jumping back to the new maximum on next lazy-init.
         if apStorage.saveData.buffs and apStorage.saveData.buffs.health ~= nil then
             if amount > 0 then
                 apStorage.saveData.buffs.health = apStorage.saveData.buffs.health + amount

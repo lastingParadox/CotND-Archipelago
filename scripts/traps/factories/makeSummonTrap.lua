@@ -93,7 +93,6 @@ end
 ---                           Return false to skip this player silently.
 ---@return function trapFn
 local function makeSummonTrap(opts)
-    assert(opts.flyawayText, "makeSummonTrap: opts.flyawayText is required")
     assert(opts.variants or opts.getVariants or opts.perPlayerSetup,
         "makeSummonTrap: one of opts.variants, opts.getVariants, or opts.perPlayerSetup is required")
 
@@ -141,7 +140,9 @@ local function makeSummonTrap(opts)
                 if #weighted == 0 then
                     -- Negated / empty: show flyaway without spawning.
                     sound.playFromEntity(opts.sound or "trapDice", entity)
-                    apFlyaways.addToFlyawayQueue({ entity = entity, text = entityFlyaway })
+                    if entityFlyaway then
+                        apFlyaways.addToFlyawayQueue({ entity = entity, text = entityFlyaway })
+                    end
                     trapSuccess = true
                     goto continue
                 end
@@ -191,7 +192,9 @@ local function makeSummonTrap(opts)
             if requireSpawns and not anySpawned then goto continue end
 
             sound.playFromEntity(opts.sound or "trapDice", entity)
-            apFlyaways.addToFlyawayQueue({ entity = entity, text = entityFlyaway })
+            if entityFlyaway then
+                apFlyaways.addToFlyawayQueue({ entity = entity, text = entityFlyaway })
+            end
             trapSuccess = true
 
             ::continue::

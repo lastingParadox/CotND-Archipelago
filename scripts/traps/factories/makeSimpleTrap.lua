@@ -35,8 +35,6 @@ local apFlyaways = require "AP.scripts.ui.apFlyaways"
 ---                     If true, the trap returns true even if no entities matched.
 ---@return function trapFn
 local function makeSimpleTrap(opts)
-    assert(opts.flyawayText, "makeSimpleTrap: opts.flyawayText is required")
-
     return function(ev)
         if opts.before then opts.before() end
 
@@ -61,7 +59,9 @@ local function makeSimpleTrap(opts)
             local flyawayText = type(opts.flyawayText) == "function"
                 and opts.flyawayText(entity, ctx)
                 or opts.flyawayText
-            apFlyaways.addToFlyawayQueue({ entity = entity, text = flyawayText })
+            if flyawayText then
+                apFlyaways.addToFlyawayQueue({ entity = entity, text = flyawayText })
+            end
             trapSuccess = true
 
             ::continue::

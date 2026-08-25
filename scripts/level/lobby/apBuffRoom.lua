@@ -3,9 +3,7 @@ local marker = require("necro.game.tile.Marker")
 local object = require("necro.game.object.Object")
 
 local apCharacters = require("AP.scripts.utils.apCharacters")
-local apTypes = require("AP.scripts.utils.types")
 local lobbyUtils = require("AP.scripts.utils.lobbyUtils")
-local progression = require("AP.scripts.client.progression")
 
 marker.Type.extend("AP_BUFF_SPAWN")
 
@@ -67,8 +65,8 @@ function apBuffRoom.generateBuffRoom(sourceX, sourceY)
     object.spawn("AP_TriggerBuffHealthIncrease", minX + 4, minY + 6)
 
     -- ── Bonus potion selector, mirrored one tile in from the right wall ────
-    object.spawn("AP_BuffPotionLabel", maxX - 3, minY + 5, {
-        worldLabel = { text = apTypes.PotionModeTitles[progression.getPotionMode()], offsetY = -8 }
+    object.spawn("LabelLobby", maxX - 3, minY + 5, {
+        worldLabel = { text = "Potions on Run Start", offsetY = -8 }
     })
 
     object.spawn("AP_TriggerBuffPotionDecrease", maxX - 4, minY + 6)

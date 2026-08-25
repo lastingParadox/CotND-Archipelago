@@ -1,23 +1,73 @@
-local color = require("system.utils.Color")
 local ecs = require("system.game.Entities")
 local grayscaleFilter = require("necro.render.filter.GrayscaleFilter")
 local objectPreview = require("necro.render.level.ObjectPreview")
 local playerList = require("necro.client.PlayerList")
 local render = require("necro.render.Render")
+local settings = require("necro.config.Settings")
 local ui = require("necro.render.UI")
 local utils = require("system.utils.Utilities")
 
+local color = require("AP.scripts.utils.apColors")
+
 local apPreview = {}
 
-local SILHOUETTE_OUTLINE = color.rgb(114, 126, 133)
-local INDICATOR_LOCKED = color.rgb(255, 87, 106)
-local INDICATOR_DISABLED = color.rgb(120, 120, 120)
-local INDICATOR_REQUIREMENT = color.rgb(255, 196, 87)
+local OUTLINE_ALPHA = 0.85
+
+-- Declared here rather than with the renderer: a settings global is bound to the script
+-- that assigns it, so only this file can read it.
+apShowLocationOutlines = settings.user.bool({
+    id = "AP.video.locationOutlines",
+    name = "Outline location checks",
+    default = true,
+})
+
+function apPreview.outlinesEnabled()
+    return apShowLocationOutlines
+end
 
 function apPreview.indicatorColor(disabled, missingRequirement)
-    if disabled then return INDICATOR_DISABLED end
-    if missingRequirement then return INDICATOR_REQUIREMENT end
-    return INDICATOR_LOCKED
+    if disabled then return color.disabled end
+    if missingRequirement then return color.requirement end
+    return color.locked
+end
+
+-- The prototype whose sprite stands in for an item; a character carrier draws its character.
+function apPreview.spriteSource(item)
+    if not item.AP_character then return item end
+
+    local name = item.AP_character.name
+    if name == "" then return item end
+
+    return ecs.getEntityPrototype(name) or item
+end
+
+-- Points a content visual at `source`'s sprite, anchored bottom-centre on the item's own.
+function apPreview.retextureContent(visual, item, source)
+    if source == item or not source.sprite then return visual end
+
+    local sprite = source.sprite
+
+    visual.texture = sprite.texture
+    visual.texRect[1] = sprite.textureShiftX
+    visual.texRect[2] = sprite.textureShiftY
+    visual.texRect[3] = sprite.width
+    visual.texRect[4] = sprite.height
+
+    visual.rect[1] = visual.rect[1] - (sprite.width - item.sprite.width) / 2
+    visual.rect[2] = visual.rect[2] - (sprite.height - item.sprite.height)
+    visual.rect[3] = sprite.width
+    visual.rect[4] = sprite.height
+
+    return visual
+end
+
+-- The colour a mid-run check outlines in, or nil when it is not one.
+function apPreview.checkOutline(item)
+    if not (item.AP_locationItem and item.AP_locationItem.locationName ~= "") then return nil end
+    if not apShowLocationOutlines then return nil end
+
+    return color.fade(
+        color.forClassification(item.AP_locationItem.classification), OUTLINE_ALPHA)
 end
 
 local function resolve(proto)
@@ -48,7 +98,7 @@ function apPreview.draw(proto, opts)
         animationSpeed = opts.animationSpeed
             or (proto.previewAnimationSpeed and proto.previewAnimationSpeed.factor),
         color = silhouette and color.BLACK or nil,
-        outline = silhouette and SILHOUETTE_OUTLINE
+        outline = silhouette and color.silhouette
             or (component.outlineColor and component.outlineColor ~= color.TRANSPARENT and component.outlineColor)
             or nil,
         shadowCopyZ = component.shadowCopyZ,
@@ -66,7 +116,7 @@ function apPreview.draw(proto, opts)
                 x = x,
                 y = y,
                 color = silhouette and color.BLACK or nil,
-                outline = silhouette and SILHOUETTE_OUTLINE or nil,
+                outline = silhouette and color.silhouette or nil,
                 animationSpeed = 0,
                 AP_noHover = true,
                 shadow = false,
@@ -128,7 +178,7 @@ function apPreview.draw(proto, opts)
                 alignY = alignY,
                 text = "?",
                 font = ui.Font.MEDIUM,
-                fillColor = opts.indicatorColor or INDICATOR_LOCKED,
+                fillColor = opts.indicatorColor or color.locked,
                 shadowColor = color.TRANSPARENT,
                 x = ix,
                 y = iy,

@@ -38,6 +38,8 @@ event.tick.add("apUploadState", { order = "lobby", sequence = 4 }, function()
     -- The connected flag gates too much to wait out the throttle.
     if ticksUntilUpload > 0 and not connectionChanged then return end
     ticksUntilUpload = UPLOAD_INTERVAL
+
+    resources.uploadIfChanged(AP_STATE, "APState", buildPayload())
 end)
 
 event.resourceLoaded.add("apApplyState", AP_STATE, function()

@@ -91,8 +91,8 @@ local function makeCameraTrap(opts)
 
     ---Trigger function registered with TrapHandler.
     ---Returns true on success, false to stay queued.
-    return function(ev)
-        local replayKey = "cameraTrap:" .. opts.name
+    return function(ev, args, ticket)
+        local replayKey = "cameraTrap:" .. opts.name .. ":" .. tostring(ticket)
 
         if opts.isActive() then
             -- Wall-clock timestamp outlives a rollback the queue entry does not,

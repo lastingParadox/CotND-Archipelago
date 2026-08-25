@@ -3,6 +3,7 @@ local currency = require "necro.game.item.Currency"
 local currentLevel = require("necro.game.level.CurrentLevel")
 local ecs = require "system.game.Entities"
 local extraMode = require "necro.game.data.modifier.ExtraMode"
+local flyaway = require "necro.game.system.Flyaway"
 local gameSession = require "necro.client.GameSession"
 local instantReplay = require "necro.client.replay.InstantReplay"
 local inventory = require("necro.game.item.Inventory")
@@ -14,6 +15,7 @@ local object = require("necro.game.object.Object")
 local player = require("necro.game.character.Player")
 local playerList = require("necro.client.PlayerList")
 local replayPlayer = require "necro.client.replay.ReplayPlayer"
+local speedrunTimer = require "necro.client.SpeedrunTimer"
 
 local apCharacters = require("AP.scripts.utils.apCharacters")
 local apClient = require("AP.scripts.client.client")
@@ -30,9 +32,6 @@ local progressionPlayer = require("AP.scripts.client.progression.player")
 local progressionShops = require("AP.scripts.client.progression.shops")
 local progressionZoneAccess = require("AP.scripts.client.progression.zoneAccess")
 
--- The story bosses, shared with progression.goals so the Story goal and the
--- boss-check sender agree on one list. The abbreviation is what the character
--- selector shows alongside the zone numbers.
 local SPECIAL_BOSSES = {
     [boss.Type.DEAD_RINGER]     = { name = "Dead Ringer",     abbreviation = "DR", zone = 4, characters = { Cadence = true } },
     [boss.Type.NECRODANCER]     = { name = "NecroDancer",     abbreviation = "ND", zone = 4, characters = { Cadence = true } },
@@ -148,6 +147,16 @@ event.objectCharacterSwitchTo.add("apRemoveLockedInitialItems", {
     end
 end)
 
+-- Outcome of the run's All Zones time limit, for the run summary to color. nil
+-- means nothing was timed, so the summary stays vanilla.
+function progression.getSpeedrunResult()
+    return progression.speedrunResult
+end
+
+event.gameStateReset.add("apClearSpeedrunResult", { order = "resetRunVariables" }, function()
+    progression.speedrunResult = nil
+end)
+
 event.levelComplete.add("apLevelComplete", { order = "winScreen" }, function(ev)
     local mode = gameSession.getCurrentMode().id
 
@@ -155,6 +164,7 @@ event.levelComplete.add("apLevelComplete", { order = "winScreen" }, function(ev)
         or replayPlayer.isActive()
         or gameSession.getCurrentMode().id == "APHintMode"
         or not apUtils.isAPContext()
+        or not apClient.isSessionConnected()
     then
         return
     end
@@ -192,16 +202,10 @@ event.levelComplete.add("apLevelComplete", { order = "winScreen" }, function(ev)
             processedCharacters[character] = true
 
             local zones = {}
-
-            -- Keyed by the boss's own name, the same key Python derives from the
-            -- UNIQUE_BOSS location, so the Story goal and the character selector
-            -- see the kill without waiting for the save to round-trip.
             if specialBoss and specialBoss.characters[character] then
                 table.insert(zones, { name = specialBoss.name, zone = specialBoss.name })
             end
 
-            -- The zone clear is one check for everyone, at every setting. Dove has
-            -- no boss, so hers lands on floor 3 instead.
             if (currentLevel.isBoss() and character ~= "Dove") or (character == "Dove" and curFloor == 3) then
                 if not firstPhaseBosses[bossType] then
                     table.insert(zones, { name = "Zone " .. curZone, zone = "Zone " .. curZone })
@@ -215,7 +219,29 @@ event.levelComplete.add("apLevelComplete", { order = "winScreen" }, function(ev)
 
             local lastZone = progression.isDLCEnabled("Amplified") and 5 or 4
             if mode == "APAllZones" and currentLevel.isFinal() and progression.allZonesUnlocked(lastZone) then
-                table.insert(zones, { name = "All Zones", zone = "All Zones" })
+                local target = progression.getSpeedrunTime(character)
+                local runTime = speedrunTimer.getDeterministicTime()
+
+                local passed = target == 0 or runTime <= target * 60
+
+                if passed then
+                    table.insert(zones, { name = "All Zones", zone = "All Zones" })
+                else
+                    flyaway.create({
+                        entity = playerEntity,
+                        text = ("Too slow! %s / %d:00"):format(
+                            speedrunTimer.formatTime(runTime), target),
+                    })
+                end
+
+                if target > 0 then
+                    local prior = progression.speedrunResult
+                    progression.speedrunResult = {
+                        passed = passed and (prior == nil or prior.passed),
+                        time = runTime,
+                        target = target * 60,
+                    }
+                end
             end
 
             if #zones > 0 then

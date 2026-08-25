@@ -1,7 +1,7 @@
-local damage = require("necro.game.system.Damage")
 local player = require("necro.game.character.Player")
 
 local apFlyaways = require("AP.scripts.ui.apFlyaways")
+local APFlags = require("AP.scripts.utils.flags")
 local TrapHandler = require("AP.scripts.traps.trapHandler")
 
 local function timerTrap(ev)
@@ -23,7 +23,7 @@ local function timerTrap(ev)
         entity.AP_damageCountdown.damage         = 3
         entity.AP_damageCountdown.countdownReset = 16
         entity.AP_damageCountdown.killerName     = "Timer Trap"
-        entity.AP_damageCountdown.type           = damage.Type.TRAP
+        entity.AP_damageCountdown.type           = APFlags.DAMAGE_AP_TRAP
         entity.AP_damageCountdown.active         = true
 
         apFlyaways.addToFlyawayQueue({

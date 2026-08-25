@@ -13,6 +13,7 @@ local hasClient, _ = pcall(require, "system.network.Client")
 
 local apClient = require("AP.scripts.client.client")
 local apCharacters = require("AP.scripts.utils.apCharacters")
+local modConflict = require("AP.scripts.utils.modConflict")
 local progression = require("AP.scripts.client.progression")
 
 -- Entity definition
@@ -53,14 +54,10 @@ local function errorNotification(entity, text, positionEntity)
 end
 
 local function zoneAccessAllowed(zone, characterName, lastZone)
-    if progression.getZoneAccessKeys() == 1 then
-        -- Separate: each zone needs its own key. The starting zone's key is
-        -- precollected, so possession alone answers it.
+    if progression.getZoneAccessKeys() == "separate" then
         return progression.hasZoneAccess(zone)
     end
 
-    -- Progressive counts every copy held, precollected included, so zone 1 is the
-    -- base. A slot with keys disabled is granted the full set and lands here too.
     local totalAccessible = 1 + progression.getProgressiveZoneAccessCount()
 
     if characterName == "Aria" then
@@ -73,21 +70,29 @@ end
 
 local function getZoneAccessKeyLockedText(zone)
     local mode = progression.getZoneAccessKeys()
-    if mode == 0 then return nil end
+    if mode == "disabled" then return nil end
 
-    if mode == 1 then
-        if zone and zone > 0 then
-            local startingZone = progression.getStartingZone()
-            if zone == startingZone then return nil end
-            return "Find the key to unlock!"
-        end
-
-        return "Find the key to unlock!"
-    elseif mode == 2 then
-        return "Find the key to unlock!"
+    -- Separate keys name their zone, so the starting zone is already open.
+    if mode == "separate" and zone and zone > 0 and zone == progression.getStartingZone() then
+        return nil
     end
 
-    return nil
+    return "Find the key to unlock!"
+end
+
+
+local function isBossRushPartyCapable()
+    local selected = player.getSelectedPlayerCharacters()
+    local anySelected = false
+
+    for _, characterName in pairs(selected) do
+        anySelected = true
+        if apCharacters.cotNDCharToAPLocation(characterName) ~= "Dove" then
+            return true
+        end
+    end
+
+    return not anySelected
 end
 
 local function isZoneProgressUnlocked(entity)
@@ -102,7 +107,13 @@ local function isZoneProgressUnlocked(entity)
 
     if entity.trapStartRun.mode == "AP_APEnsemble" or entity.trapStartRun.mode == "AP_APBossRush" then
         local _, goalMet = progression.calculateGoalCompletion(false)
-        return goalMet
+        if not (goalMet and progression.allZonesUnlocked(lastZone)) then return false end
+
+        if entity.trapStartRun.mode == "AP_APBossRush" then
+            return isBossRushPartyCapable()
+        end
+
+        return true
     end
 
     local zone = entity.trapStartRun.zone
@@ -111,9 +122,6 @@ local function isZoneProgressUnlocked(entity)
     -- Disallow Zone 5 if Amplified is off
     if (lastZone == 4 and zone == 5) then return false end
 
-    -- zoneAccessAllowed already fully encodes each key mode's unlock rule
-    -- (Disabled/Separate/Progressive), so no extra per-character location
-    -- lookup is needed here.
     for _, characterName in pairs(player.getSelectedPlayerCharacters()) do
         local name = apCharacters.cotNDCharToAPLocation(characterName)
         if progression.getCharacters(name) and zoneAccessAllowed(zone, characterName, lastZone) then
@@ -141,12 +149,17 @@ local function isHintModeUnlocked(_)
     return apClient.isSessionConnected()
 end
 
+local function isModConflictFree(_)
+    return not modConflict.hasLegacyArchipelago()
+end
+
 local lockEvaluators = {
     none = isAlwaysUnlocked,
     zoneProgress = isZoneProgressUnlocked,
     characterRoomKey = isCharacterRoomKeyUnlocked,
     apModules = isAPModulesUnlocked,
     hintMode = isHintModeUnlocked,
+    modConflict = isModConflictFree,
 }
 
 local function getLockType(entity)
@@ -179,7 +192,8 @@ end
 -- so it stays below rather than joining the table.
 local lockedTiles = {
     apModules = "LobbyStairsDisabled",
-    characterRoomKey = "LobbyStairsInaccessible",
+    modConflict = "LobbyStairsDisabled",
+    characterRoomKey = "LobbyLockedStairs",
 }
 
 local function getLockedTileType(entity)
@@ -190,11 +204,11 @@ local function getLockedTileType(entity)
             return "LobbyStairsDisabled"
         end
 
-        if progression.getZoneAccessKeys() == 0 then
+        if progression.getZoneAccessKeys() == "disabled" then
             return "LobbyLockedStairs"
         end
 
-        return "LobbyStairsInaccessible"
+        return "LobbyLockedStairs"
     end
 
     return lockedTiles[lockType]
@@ -211,17 +225,15 @@ local function getZoneProgressLockedText(trap, victim)
     end
 
     if trap.trapStartRun.mode == "AP_APEnsemble" or trap.trapStartRun.mode == "AP_APBossRush" then
-        local completed, _ = progression.calculateGoalCompletion(false)
-        local required = progression.getGoalRequired() or 0
-        local remaining = math.max(0, required - completed)
-        local goalType = progression.getGoal()
-        if goalType == "Zones" then
-            return "Beat " .. remaining .. " more zone" .. (remaining == 1 and "" or "s") .. "\nto unlock!"
-        elseif goalType == "Golden Lute Shards" then
-            return "Collect " .. remaining .. " more shard" .. (remaining == 1 and "" or "s") .. "\nto unlock!"
-        else
-            return "Beat " .. remaining .. " more all zones\nrun" .. (remaining == 1 and "" or "s") .. " to unlock!"
+
+        local goalText = progression.getGoalUnlockText()
+        if goalText then return goalText end
+
+        if trap.trapStartRun.mode == "AP_APBossRush" and not isBossRushPartyCapable() then
+            return "Locked! Pick another character!"
         end
+
+        return "Unlock every zone\nto enter!"
     end
 
     local character = victim and victim.name or "Cadence"
@@ -322,6 +334,23 @@ event.trapTrigger.add("apHintTrapSetup", {
 
     -- Override the character for the run via trapStartRun.options (merged into gameSession.start parameters).
     ev.trap.trapStartRun.options = { characterOverride = chosenChar }
+end)
+
+-- With a single zone reachable, AP Zones Mode is a single-zone run wearing the wrong
+-- mode, so we switch the mode over to "APSingleZone".
+event.trapTrigger.add("apZonesModeSingleZone", {
+    filter = "trapStartRun",
+    order = "descend",
+    sequence = -1,
+}, function(ev)
+    if not ev.success then return end
+    if ev.trap.trapStartRun.mode ~= "AP_APAllZones" then return end
+
+    local accessible = progression.getAccessibleZones()
+    if #accessible ~= 1 then return end
+
+    ev.trap.trapStartRun.mode = "AP_APSingleZone"
+    ev.trap.trapStartRun.zone = accessible[1]
 end)
 
 event.trapTrigger.add("handleAPTrapUnlock", {

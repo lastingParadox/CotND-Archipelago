@@ -81,9 +81,10 @@ local function attach(progression)
         return located[kind]
     end
 
-    function progression.getNextChestLocation(zone, kind)
+    function progression.getNextChestLocation(zone, kind, taken)
         for _, located in ipairs(progression.getChestLocations(zone, kind) or {}) do
-            if located.Item and located.Item ~= "" and not located.Checked then
+            if located.Item and located.Item ~= "" and not located.Checked
+                and not (taken and taken(located)) then
                 return located
             end
         end

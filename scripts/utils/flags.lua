@@ -9,6 +9,12 @@ APFlags.DAMAGE_DEATH_LINK = damage.Flag.mask(
     damage.Flag.BYPASS_ARMOR,
     damage.Flag.BYPASS_INVINCIBILITY
 )
+
+APFlags.DAMAGE_AP_TRAP = damage.Flag.mask(
+    damage.Flag.extend("AP_TRAP"),
+    damage.Flag.BYPASS_ARMOR
+)
+
 APFlags.CURRENCY_AP_DIAMOND = currency.Type.extend("AP_diamond")
 
 return APFlags

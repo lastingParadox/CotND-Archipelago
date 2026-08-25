@@ -1,6 +1,7 @@
 local action = require "necro.game.system.Action"
 local currency = require "necro.game.item.Currency"
 local currentLevel = require "necro.game.level.CurrentLevel"
+local flyaway = require "necro.game.system.Flyaway"
 local rng = require "necro.game.system.RNG"
 local sound = require "necro.audio.Sound"
 
@@ -9,7 +10,6 @@ local apNpc = require("AP.scripts.entities.apNpc")
 local progression = require("AP.scripts.client.progression")
 
 local GOLD_COST = 50
-local DIAMONDS = 1
 
 -- monkeyHit is a group of three files the engine picks between, so listing it three
 -- times against monkeyGrab gives the four-way choice.
@@ -45,13 +45,20 @@ apNpc.make("AP_Exchanger", {
     sale = {},
     priceTag = { active = true },
     priceTagCostCurrency = { cost = GOLD_COST },
-    priceTagLabel = { offsetY = 16, offsetX = -12 },
     priceTagIgnoreMultiplier = {},
     priceTagDepthMultiplier = { active = false },
     priceTagUnaffordableFlyaway = {},
-    priceTagSuccessFlyaway = { text = "+" .. DIAMONDS .. " Diamond" },
     soundPriceTagPurchaseFail = {},
     soundPriceTagPurchaseSuccess = {},
+
+    -- The numeric priceTagLabel is left off: one trade takes every 50 the player has, so
+    -- the tag states the rate instead of a cost. secretShopLabel is the only price label
+    -- that draws text, and it stays up at 0 gold where the numeric one would vanish.
+    secretShopLabel = {
+        text = "%d:1",
+        offsetY = 16,
+        offsetX = -12
+    },
 })
 
 event.objectSpawn.add("apExchangerPriceTag",
@@ -65,8 +72,27 @@ event.objectInteract.add("apExchangerTrade",
     function(ev)
         if ev.suppressed then return end
 
-        currency.add(ev.interactor, apFlags.CURRENCY_AP_DIAMOND, DIAMONDS)
-        progression.changeDiamonds(DIAMONDS)
+        -- The price tag already took the first 50 and refused anyone who could not pay it,
+        -- so what is left here converts too: lobby gold has no other use, and trading it a
+        -- coin at a time was just repetition.
+        local remaining = currency.get(ev.interactor, currency.Type.GOLD)
+        local extra = math.floor(remaining / GOLD_COST)
+
+        if extra > 0 then
+            currency.subtract(ev.interactor, currency.Type.GOLD, extra * GOLD_COST)
+        end
+
+        local diamonds = 1 + extra
+
+        currency.add(ev.interactor, apFlags.CURRENCY_AP_DIAMOND, diamonds)
+        progression.changeDiamonds(diamonds)
+
+        -- priceTagSuccessFlyaway's text is fixed at schema load and fires before the total
+        -- is known, so the payout announces itself here.
+        flyaway.create({
+            entity = ev.interactor,
+            text = "+" .. diamonds .. (diamonds == 1 and " Diamond" or " Diamonds"),
+        })
 
         local channel = rng.makeChannel(currentLevel.getSeed(), ev.entity.id,
             progression.getDiamonds() or 0)

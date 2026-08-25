@@ -18,6 +18,7 @@ local apGameModeSelect = require("AP.scripts.level.lobby.apGameModeSelect")
 local apLobby = require("AP.scripts.level.apLobby")
 local apItemRoom = require("AP.scripts.level.lobby.apItemRoom")
 local lobbyUtils = require("AP.scripts.utils.lobbyUtils")
+local modConflict = require("AP.scripts.utils.modConflict")
 
 marker.Type.extend("AP_SPAWN")
 
@@ -40,9 +41,6 @@ local apLobbyGenerateSelector = orderedSelector.new(event.apLobbyGenerate, {
 })
 
 local itemRoomGenerated = false
-
--- What the standing room was built from. Connecting to a different slot ships a
--- different list, and the room is carved geometry that cannot be edited in place.
 local itemRoomSignature = ""
 
 local victorySlotX = nil
@@ -70,10 +68,19 @@ end
 local function createMainAPTrapdoor(originX, originY)
     local sourceX, sourceY = 3, 0
     local lockedText = "Whitelist the Client and Storage modules\nin your config to connect!"
+    local conflicted = modConflict.hasLegacyArchipelago()
 
     lobbyUtils.addLabel(sourceX, sourceY, "mod.AP.lobby.stair")
 
-    if hasStorage and hasClient then
+    if conflicted then
+        tile.setType(sourceX, sourceY, "LobbyStairsDisabled")
+        object.spawn("AP_TriggerAPTrap", sourceX, sourceY, {
+            AP_trapUnlock = {
+                lockType = "modConflict",
+                lockedText = modConflict.WARNING,
+            }
+        })
+    elseif hasStorage and hasClient then
         lobbyUtils.addDestination(sourceX, sourceY, originX, originY, nil, "TriggerOpenMenu")
     else
         tile.setType(sourceX, sourceY, "LobbyStairsDisabled")
@@ -87,7 +94,9 @@ local function createMainAPTrapdoor(originX, originY)
 end
 
 event.lobbyGenerate.add("generateAPLobbyLevel", { order = "modes", sequence = 1 }, function(_)
-    if hasStorage and hasClient then
+    if modConflict.hasLegacyArchipelago() then
+        createMainAPTrapdoor(0, 0)
+    elseif hasStorage and hasClient then
         itemRoomGenerated = false
         apLobbyGenerateSelector.fire({
             segmentID = nil,
@@ -156,7 +165,7 @@ event.apLobbyGenerate.add("generateTraps", "traps", function(ev)
     lobbyUtils.addBackToLobby(ev.origin.x + 3, 0)
 
     -- AP Zones Mode Trap
-    lobbyUtils.addLabel(offsetX, offsetY, "mod.AP.lobby.stair.zones")
+    object.spawn("AP_ZonesStairLabel", offsetX, offsetY)
     object.spawn("AP_TriggerAPTrap", offsetX, offsetY)
 
     object.spawn("AP_Exchanger", offsetX - 5, offsetY - 4)
@@ -359,7 +368,13 @@ event.apLobbyGenerate.add("generateSettingsMasterRoom", "settingsmaster", functi
     local entranceY = minY + 3
 
     lobbyUtils.clearTile(entranceX, entranceY, "Zone2")
-    object.spawn("AP_LobbyDoor", entranceX, entranceY, { AP_progressionDoor = { npc = {}, orientation = "vertical" } })
+    object.spawn("AP_LobbyDoor", entranceX, entranceY, {
+        AP_progressionDoor = {
+            npc = {},
+            orientation = "vertical",
+            label = "mod.AP.lobby.npc.settingsmaster",
+        }
+    })
 end)
 
 event.apLobbyGenerate.add("generateHintmasterRoom", "hintmaster", function(ev)

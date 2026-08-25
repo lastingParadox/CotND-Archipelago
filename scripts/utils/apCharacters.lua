@@ -76,39 +76,20 @@ apCharacters.characterRequirements = {
     ["Shovel Knight"] = "Shovel Knight",
 }
 
-apCharacters.normalItemRequirements = {
-    Aria = { "MiscPotion", "CharmNazar" },
-    Dorian = { "FeetBootsLeaping" },
-    Monk = { "ShovelBlood" },
-    Bolt = { "WeaponSpear" },
-    Dove = { "RingPeace" },
-    Nocturna = { "WeaponCutlass" },
-    Mary = { "WeaponSpear", "FoodCookies", "CharmNazar" },
-    Tempo = { "WeaponBloodDagger", "MiscCompass" },
-    Sync_Klarinetta = { "CharmNazar" },
-}
-
-apCharacters.uniqueItemRequirements = {
-    Melody = { "WeaponGoldenLute" },
-    Dorian = { "ArmorPlatemailDorian" },
-    Eli = { "WeaponEli" },
-    Dove = { "WeaponFlower" },
-    Nocturna = { "SpellTransform" },
-    Sync_Klarinetta = { "Sync_WeaponReallyBigSword", "Sync_ArmorPlatemailShiny" },
-    Sync_Chaunter = { "Sync_WeaponLantern" },
-    Sync_Suzu = { "Sync_WeaponLance" },
-    Coldsteel_Coldsteel = { "Coldsteel_WeaponLeek", "Coldsteel_ArmorVirtual", "Coldsteel_SpellResonance" },
-    Goldman_Goldman = { "Goldman_ShovelPogo" }
-}
-
 apCharacters.innateStarterItems = {
     Mary = { "Marv" },
 }
 
+-- The unique gear a character is handed on selection, from the slot's own requirement list.
+function apCharacters.getUniqueItems(name)
+    return progression.getCharacterRequirements(name).unique
+end
+
 function apCharacters.getMissingRequiredItems(name)
     local characterUnlocks = progression.getCharacterUnlocks()
-    if characterUnlocks ~= 1 and characterUnlocks ~= 2 then return nil end
+    if characterUnlocks == "item_only" then return nil end
 
+    local requirements = progression.getCharacterRequirements(name)
     local missing = {}
 
     local function collectMissing(items)
@@ -119,12 +100,14 @@ function apCharacters.getMissingRequiredItems(name)
         end
     end
 
-    if characterUnlocks == 2 or name == "Dorian" then
-        collectMissing(apCharacters.normalItemRequirements[name])
+    -- Soft only gates on unique gear, but Dorian is unplayable without his boots: the
+    -- armour he cannot remove leaves him no other way to move.
+    if characterUnlocks == "required_items_hard" or name == "Dorian" then
+        collectMissing(requirements.normal)
     end
 
     if progression.getIncludeUniqueItems() then
-        collectMissing(apCharacters.uniqueItemRequirements[name])
+        collectMissing(requirements.unique)
     end
 
     return #missing > 0 and missing or nil

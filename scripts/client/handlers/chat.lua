@@ -12,15 +12,14 @@ handlers.register("Chat", function(message, ctx)
 
     apLog("Received chat message from " .. tostring(message.player) .. ": " .. message.msg)
 
-    if message.player and message.player ~= "Archipelago" then
+    if message.player and message.player ~= "Archipelago" and message.player ~= "Server" then
         chat.addMessage({
             name  = message.player,
             text  = message.msg,
             sound = chat.Sound.MESSAGE_LOCAL,
         })
     else
-        -- Command result / system message: stamp the sentinel so our override
-        -- can apply the AP badge after the vanilla display handler runs.
+        -- AP Badge override
         local msg = {
             name = "",
             text  = message.msg,

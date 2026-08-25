@@ -1,9 +1,7 @@
 local customEntities = require "necro.game.data.CustomEntities"
-local flyaway = require "necro.game.system.Flyaway"
-local itemPickup = require "necro.game.item.ItemPickup"
-local sound = require "necro.audio.Sound"
 
 local apFlags = require("AP.scripts.utils.flags")
+local apGrants = require("AP.scripts.items.apGrants")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 local progression = require("AP.scripts.client.progression")
 
@@ -37,23 +35,9 @@ apItemFactory.define({
     },
 })
 
-event.objectTryCollectItem.add("apVictoryItemGoalGate", { order = "priceTag", sequence = -100 }, function(ev)
-    if not (ev.item and ev.item.AP_victoryItem) then return end
-    local completed, goalMet = progression.calculateGoalCompletion(false)
-    if not goalMet then
-        local required = progression.getGoalRequired() or 0
-        local remaining = math.max(0, required - completed)
-        local goalType = progression.getGoal()
-        local text
-        if goalType == "Zones" then
-            text = "Beat " .. remaining .. " more zone" .. (remaining == 1 and "" or "s") .. "\nto unlock!"
-        elseif goalType == "Golden Lute Shards" then
-            text = "Collect " .. remaining .. " more shard" .. (remaining == 1 and "" or "s") .. "\nto unlock!"
-        else
-            text = "Beat " .. remaining .. " more all zones\nrun" .. (remaining == 1 and "" or "s") .. " to unlock!"
-        end
-        flyaway.create({ entity = ev.item, text = text })
-        sound.playFromEntity("error", ev.item)
-        ev.result = itemPickup.Result.FAILURE
-    end
-end)
+-- Buying it is the victory trigger, so the goal has to be met before the diamonds are.
+-- The purchase itself is handled by the shop slot, which owns the price tag.
+apGrants.define({
+    carrier = "AP_VictoryItem",
+    gate = function() return progression.getGoalUnlockText() end,
+})

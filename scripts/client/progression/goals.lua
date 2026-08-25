@@ -14,6 +14,34 @@ local apClient = require("AP.scripts.client.client")
 local apStorage = require("AP.scripts.client.storage")
 
 local function attach(progression)
+    function progression.addGoldenLuteShard()
+        apStorage.saveData.goldenLuteShards = (apStorage.saveData.goldenLuteShards or 0) + 1
+        progression.calculateGoalCompletion(true)
+    end
+
+    -- Why the goal is not yet met, phrased for a flyaway, or nil once it is. Shared by
+    -- everything the goal gates so they cannot drift apart on the wording.
+    function progression.getGoalUnlockText()
+        local completed, goalMet = progression.calculateGoalCompletion(false)
+        if goalMet then return nil end
+
+        local remaining = math.max(0, (progression.getGoalRequired() or 0) - completed)
+        local goalType = progression.getGoal()
+        local function plural(one, many)
+            return remaining == 1 and one or many
+        end
+
+        if goalType == "Zones" then
+            return "Beat " .. remaining .. " more " .. plural("zone", "zones") .. "\nto unlock!"
+        elseif goalType == "Golden Lute Shards" then
+            return "Collect " .. remaining .. " more " .. plural("shard", "shards") .. "\nto unlock!"
+        elseif goalType == "Story" then
+            return "Beat " .. remaining .. " more story\n" .. plural("boss", "bosses") .. " to unlock!"
+        end
+
+        return "Beat " .. remaining .. " more all zones\n" .. plural("run", "runs") .. " to unlock!"
+    end
+
     function progression.addLevelCompleteChecks(checksList, character, collected)
         if apStorage.saveData.characterLocations[character] == nil then
             apStorage.saveData.characterLocations[character] = {}

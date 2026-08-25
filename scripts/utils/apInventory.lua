@@ -6,7 +6,7 @@ local itemSlot = require "necro.game.item.ItemSlot"
 local object = require("necro.game.object.Object")
 
 local apCharacters = require("AP.scripts.utils.apCharacters")
-local characterBuffs = require("AP.scripts.character.buffs.init")
+local buffs = require("AP.scripts.buffs.init")
 
 local apInventory = {}
 
@@ -30,7 +30,7 @@ end
 
 local function getCharacterUniqueItems(entity)
     if not entity then return nil end
-    return apCharacters.uniqueItemRequirements[entity.name]
+    return apCharacters.getUniqueItems(entity.name)
 end
 
 local function getCharacterInnateItems(entity)
@@ -72,6 +72,21 @@ end
 
 local function isInnateStarterAllowed(entity, itemType)
     return isInItemList(itemType, getCharacterInnateItems(entity))
+end
+
+-- The two vanilla coin upgrades stack, so the progressive item hands them out in order.
+local COIN_UPGRADES = { "CoinsX15", "CoinsX2" }
+
+local function coinUpgradeTier(itemType)
+    for tier, name in ipairs(COIN_UPGRADES) do
+        if name == itemType then return tier end
+    end
+end
+
+local function isCoinUpgradeAllowed(itemType, progression)
+    local tier = coinUpgradeTier(itemType)
+
+    return tier ~= nil and tier <= progression.getCoinMultiplierTier()
 end
 
 local function isAlwaysAllowedHeldItem(itemEntity)
@@ -149,6 +164,7 @@ function apInventory.isAllowedItem(entity, itemType, progression)
         or progression.getNextRunItems(itemType)
         or isUniqueStarterAllowed(entity, itemType, progression)
         or isInnateStarterAllowed(entity, itemType)
+        or isCoinUpgradeAllowed(itemType, progression)
 end
 
 -- Equips every Diamond Dealer nextRunItem this character can use. Called last in
@@ -243,9 +259,6 @@ function apInventory.grantMissingInnateStarterItems(entity)
     end
 end
 
--- Vanilla lobby upgrades AP hands out as permanent innate items, e.g. the coin
--- multipliers. The chest upgrades are excluded by the innate slot: they set a run
--- flag rather than being carried.
 function apInventory.grantAPInnateItems(entity, progression)
     if not (entity and progression) then return end
 
@@ -253,6 +266,10 @@ function apInventory.grantAPInnateItems(entity, progression)
         if proto.itemSlot.name == "innate" and progression.getItems(proto.name) then
             apInventory.grantItem(entity, proto.name)
         end
+    end
+
+    for tier = 1, progression.getCoinMultiplierTier() do
+        apInventory.grantItem(entity, COIN_UPGRADES[tier])
     end
 end
 
@@ -345,18 +362,6 @@ function apInventory.applyStarterInventory(entity, progression, options)
 
     apInventory.ensureShovel(entity)
 
-    -- Klarinetta's weapon slot is cursed, so the vanilla Sync_WeaponReallyBigSword
-    -- from initialInventory cannot be removed or replaced via normal inventory APIs.
-    -- Convert it in-place to the AP variant; object.convert preserves the deployed
-    -- entity's world state (dx, dy, direction, holder reference, etc.).
-    if entity.name == "Sync_Klarinetta" then
-        local weapon = inventory.getItemInSlot(entity, itemSlot.Type.WEAPON)
-        if weapon and weapon.name == "Sync_WeaponReallyBigSword" then
-            object.convert(weapon, "AP_WeaponZweihander")
-            object.processPendingConversions()
-        end
-    end
-
     -- In the lobby, Diamond Dealer purchases are part of the starting inventory
     -- until a run consumes them; equip them last so they win over the default
     -- starters. In a run this is skipped: grantNextRunItems grants and consumes.
@@ -364,8 +369,8 @@ function apInventory.applyStarterInventory(entity, progression, options)
         apInventory.equipNextRunItems(entity, progression)
     end
 
-    -- Apply any character-specific buff that is active in the buff room.
-    characterBuffs.apply(entity, progression)
+    -- Apply whatever the buff room has configured, after sanitization has run.
+    buffs.apply(entity, progression)
 end
 
 return apInventory

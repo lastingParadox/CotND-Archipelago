@@ -1,6 +1,8 @@
 local ecs = require("system.game.Entities")
 local marker = require "necro.game.tile.Marker"
 local object = require("necro.game.object.Object")
+local rectangle = require "system.utils.Rectangle"
+local segment = require "necro.game.tile.Segment"
 local tile = require("necro.game.tile.Tile")
 local tileTypes = require("necro.game.tile.TileTypes")
 
@@ -55,6 +57,36 @@ local function chamberLayout(count)
         width = math.max(CHAMBER_MIN_WIDTH, STAIR_DX + (cols - 1) * PITCH + 3),
         height = math.max(CHAMBER_MIN_HEIGHT, rows * PITCH + 6),
     }
+end
+
+-- segment.add grows the level to fit each new room, and every growth fires
+-- mapSizeChange, which reallocates and copies ten full-map arrays (tileMap, vision,
+-- light, minimap, objectMap, collision...). Adding the hub and 18 chambers one at a
+-- time therefore recopies a map that is still growing, 19 times over.
+--
+-- ensureLevelContainsSegment unions the new segment against the level rect and
+-- setLevelBounds early-returns when nothing changed, so claiming the whole footprint
+-- up front collapses all of that into a single resize. Purely how many times the map
+-- is rebuilt; the rooms land exactly where they did before.
+local function reserveLevelSpace(chamberLayouts)
+    local lastX, _, lastWidth = segment.getBounds(segment.getCount())
+
+    -- Mirrors addRoom's own placement: each room starts one tile past the previous
+    -- segment's right edge, and writes one row below its floor.
+    local right = lastX + lastWidth
+    local bottom = HUB_MIN_Y + HUB_HEIGHT
+    right = right + 1 + HUB_WIDTH
+
+    for _, layout in ipairs(chamberLayouts) do
+        right = right + 1 + layout.width
+        bottom = math.max(bottom, HUB_MIN_Y + layout.height)
+    end
+
+    local levelX, levelY, levelWidth, levelHeight = tile.getLevelBounds()
+    local needed = { lastX, HUB_MIN_Y, right - lastX, bottom - HUB_MIN_Y + 1 }
+    local merged = rectangle.union({ levelX, levelY, levelWidth, levelHeight }, needed)
+
+    tile.setLevelBounds(merged[1], merged[2], merged[3], merged[4])
 end
 
 local function generateChamber(group, layout, hubX, hubY)
@@ -119,6 +151,31 @@ function apItemRoom.generateItemRoom(x, y)
         assigned = assigned + rowCounts[index]
     end
 
+    -- The groups that end up with a stair, in the order their chambers get built, so
+    -- the reserved footprint covers exactly the rooms that follow.
+    local chamberGroups = {}
+    local assignedGame = 0
+    for index in ipairs(GAME_ROWS) do
+        local count = rowCounts[index]
+        if count <= 0 then break end
+
+        for offset = 1, count do
+            chamberGroups[#chamberGroups + 1] = gameGroups[assignedGame + offset]
+        end
+        assignedGame = assignedGame + count
+    end
+
+    for index = 1, math.min(AP_ROW.capacity, #apGroups) do
+        chamberGroups[#chamberGroups + 1] = apGroups[index]
+    end
+
+    local layouts = {}
+    for index, group in ipairs(chamberGroups) do
+        layouts[index] = chamberLayout(#group.items)
+    end
+
+    reserveLevelSpace(layouts)
+
     local hubMinX, _, hubMinY = lobbyUtils.addRoom(HUB_WIDTH, HUB_HEIGHT, HUB_MIN_Y, "Zone2")
     local hubCenterX = hubMinX + math.floor(HUB_WIDTH / 2)
 
@@ -181,8 +238,8 @@ function apItemRoom.generateItemRoom(x, y)
 
     placeRow(apGroups, 1, math.min(AP_ROW.capacity, #apGroups), AP_ROW.dy)
 
-    for _, stair in ipairs(stairs) do
-        local layout = chamberLayout(#stair.group.items)
+    for index, stair in ipairs(stairs) do
+        local layout = layouts[index]
         local arrivalX, arrivalY = generateChamber(stair.group, layout, stair.x, stair.y)
 
         lobbyUtils.addDestination(stair.x, stair.y, arrivalX, arrivalY, nil, "TriggerTravelPrimaryOnly")

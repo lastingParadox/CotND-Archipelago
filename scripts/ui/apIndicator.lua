@@ -1,4 +1,3 @@
-local color = require("system.utils.Color")
 local currentLevel = require("necro.game.level.CurrentLevel")
 local customMusicText = L("Custom music", "indicator.customMusicActive")
 local customText = L("Custom mode", "indicator.customModeActive")
@@ -18,10 +17,11 @@ local soundtrack = require("necro.game.data.Soundtrack")
 local ui = require("necro.render.UI")
 
 local apClient = require("AP.scripts.client.client")
+local apColors = require("AP.scripts.utils.apColors")
 
-local customColor = color.rgb(170, 80, 80)
+local customColor = apColors.custom
 local moddedText = L("Modded", "indicator.modsActive")
-local lowPercentColor = color.rgb(51, 51, 170)
+local lowPercentColor = apColors.lowPercent
 local lowPercentText = L("Low percent")
 
 local function renderIndicator(text, textColor, y)
@@ -78,9 +78,9 @@ event.renderUI.override("renderLowPercentIndicator", function(func, ev)
             if apClient.isSessionConnected() then
                 local version = apClient.apworldVersion
                 local label = version and ("AP v" .. version) or L("AP Connected", "indicator.apModeActive")
-                y = renderIndicator(label, color.rgb(95, 168, 80), y)
+                y = renderIndicator(label, apColors.connected, y)
             else
-                y = renderIndicator(L("AP Disconnected", "indicator.apModeInactive"), color.rgb(120, 120, 120), y)
+                y = renderIndicator(L("AP Disconnected", "indicator.apModeInactive"), apColors.disabled, y)
             end
         end
 

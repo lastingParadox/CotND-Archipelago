@@ -1,13 +1,14 @@
-local color        = require "system.utils.Color"
 local ecs          = require "system.game.Entities"
 local render       = require "necro.render.Render"
 local timer        = require "system.utils.Timer"
 local ui           = require "necro.render.UI"
 local visualExtent = require "necro.render.level.VisualExtent"
 
+local color        = require("AP.scripts.utils.apColors")
+
 local apTrapStatus = {}
 
-local DEFAULT_COLOR = color.rgb(255, 96, 96)
+local DEFAULT_COLOR = color.trapStatus
 
 -- [id] = function(entity) -> text|nil, color|nil
 local providers = {}

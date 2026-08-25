@@ -1,5 +1,6 @@
 local flyaway = require "necro.game.system.Flyaway"
 
+local apGrants = require("AP.scripts.items.apGrants")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 
 -- Someone else's item, drawn by how their world classified it. Ordered, because
@@ -35,3 +36,10 @@ event.pickupEffects.override("flyaway", { sequence = 1 }, function(func, ev)
         func(ev)
     end
 end)
+
+-- Someone else's item: the flyaway is the whole of it, and that is raised for every
+-- grant. Registered so it claims its id rather than falling through to a spawn.
+apGrants.define({
+    item = "APItem",
+    apply = function() end,
+})

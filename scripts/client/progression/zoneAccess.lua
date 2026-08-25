@@ -1,8 +1,55 @@
+local levelSequence = require("necro.game.level.LevelSequence")
+
 local apStorage = require("AP.scripts.client.storage")
 
 local function attach(progression)
+    -- The zone list a run will actually use. Zone 5 goes by the slot's Amplified
+    -- setting rather than whether the DLC happens to be loaded.
+    function progression.getZoneList()
+        local lastZone = progression.isDLCEnabled("Amplified") and 5 or 4
+        local zones = {}
+
+        for _, zone in ipairs(levelSequence.getDefaultZoneList()) do
+            if zone <= lastZone then
+                zones[#zones + 1] = zone
+            end
+        end
+
+        return zones
+    end
+
+    ---Zones an AP Zones run may visit, in play order.
+    ---@param zoneList table|nil Defaults to the full list; pass the sequence's own
+    ---when it may have been reordered by a character trait.
+    function progression.getAccessibleZones(zoneList)
+        zoneList = zoneList or progression.getZoneList()
+
+        local mode = progression.getZoneAccessKeys()
+        if mode == "disabled" then return zoneList end
+
+        local startingZone = progression.getStartingZone()
+        local accessible = {}
+
+        if mode == "progressive" then
+            local unlocked = startingZone + progression.getProgressiveZoneAccessCount()
+
+            for i = 1, math.min(unlocked, #zoneList) do
+                accessible[#accessible + 1] = zoneList[i]
+            end
+        else
+            for _, zone in ipairs(zoneList) do
+                if zone == startingZone or progression.hasZoneAccess(zone) then
+                    accessible[#accessible + 1] = zone
+                end
+            end
+        end
+
+        return accessible
+    end
+
+    -- "disabled", "separate", or "progressive".
     function progression.getZoneAccessKeys()
-        return apStorage.saveData.zoneAccessKeys or 0
+        return apStorage.saveData.zoneAccessKeys or "disabled"
     end
 
     function progression.getStartingZone()
@@ -44,7 +91,7 @@ local function attach(progression)
 
     -- Returns true when every zone up to lastZone is accessible.
     function progression.allZonesUnlocked(lastZone)
-        if progression.getZoneAccessKeys() == 1 then
+        if progression.getZoneAccessKeys() == "separate" then
             for zone = 1, lastZone do
                 if not progression.hasZoneAccess(zone) then
                     return false

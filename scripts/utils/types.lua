@@ -1,8 +1,9 @@
+-- Names rather than indices, so an option gaining a member shifts nothing.
 local PriceRandomization = {
-    VANILLA = 0,
-    VANILLA_RAND = 1,
-    ITEM_CLASS = 2,
-    COMPLETE = 3,
+    VANILLA = "Vanilla",
+    VANILLA_RAND = "Vanilla Rand",
+    ITEM_CLASS = "Item Class",
+    COMPLETE = "Complete",
 }
 
 local MessageTypes = {
@@ -23,23 +24,14 @@ local DeathlinkTypes = {
 }
 
 local PotionModes = {
-    [0] = "Bonus Potion Disabled!",
-    [1] = "Bonus Potion Every Run!",
-    [2] = "Bonus Potion Every Zone!",
-    [3] = "Bonus Potion Every Floor!",
-}
-
--- Station title; PotionModes above is the flyaway announcement.
-local PotionModeTitles = {
-    [0] = "Potion Disabled",
-    [1] = "Potion Every Run",
-    [2] = "Potion Every Zone",
-    [3] = "Potion Every Floor",
+    [0] = "Bonus Potions Disabled!",
+    [1] = "1 Potion on Run Start!",
+    [2] = "2 Potions on Run Start!",
+    [3] = "3 Potions on Run Start!",
 }
 
 return {
     PotionModes = PotionModes,
-    PotionModeTitles = PotionModeTitles,
     PriceRandomization = PriceRandomization,
     MessageTypes = MessageTypes,
     DeathlinkTypes = DeathlinkTypes

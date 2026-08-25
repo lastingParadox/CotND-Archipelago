@@ -2,17 +2,13 @@ local apLog = require("AP.scripts.utils.log").apLog
 local apStorage = require("AP.scripts.client.storage")
 
 local permItems = {
-    MiscHeartContainer = true,
-    MiscHeartContainer2 = true,
-    MiscHeartContainerCursed = true,
-    MiscHeartContainerCursed2 = true,
-    MiscHeartContainerEmpty = true,
-    MiscHeartContainerEmpty2 = true,
     Bomb = true,
     Bomb3 = true,
     BombInfinity = true,
     BombGrenade = true,
     BombGrenade3 = true,
+    -- Barrel/Crates have a chance to spawn a Skeleton/Monkey
+    EnemyPlaceholder = true,
 }
 
 local function magicFoodBase(itemName)
@@ -83,9 +79,26 @@ end
 local itemCache = {}
 local receivedCounts = {}
 
-itemCache, receivedCounts = script.persist(function()
-    return itemCache, receivedCounts
+-- Locations whose item already took hold when the player physically picked the carrier
+-- up -- a diamond credits the balance on pickup -- so the AP grant that follows must not
+-- apply it a second time. Kept mod-side: Python derives shopConsumedLocations from the
+-- checked SHOP locations and has no way to know a chest carrier applied itself.
+local appliedLocations = {}
+
+-- Locations whose carrier the player picked up in person, so the grant that follows must
+-- not announce it a second time -- the carrier already said its piece on pickup.
+local collectedLocations = {}
+
+itemCache, receivedCounts, appliedLocations, collectedLocations = script.persist(function()
+    return itemCache, receivedCounts, appliedLocations, collectedLocations
 end)
+
+-- A reload restores through the *previous* script version's closure, so any slot added
+-- since it was written comes back nil until the game is restarted outright.
+itemCache = itemCache or {}
+receivedCounts = receivedCounts or {}
+appliedLocations = appliedLocations or {}
+collectedLocations = collectedLocations or {}
 
 local function attach(progression)
     function progression.getItems(itemName)
@@ -137,9 +150,32 @@ local function attach(progression)
         return apStorage.saveData.receivedItems[tostring(apIndex)] ~= nil
     end
 
+    -- Server grants (-1) and starting inventory (-2) share their codes across every slot,
+    -- and an empty code would key every untagged carrier to the same entry.
+    local function consumableCode(locationCode)
+        if locationCode == nil or locationCode == "" then return nil end
+
+        local code = tostring(locationCode)
+        return (tonumber(code) or 0) > 0 and code or nil
+    end
+
     function progression.markLocationConsumed(locationCode)
+        local code = consumableCode(locationCode)
+        if code then appliedLocations[code] = true end
+    end
+
+    function progression.isLocationConsumed(locationCode)
+        local code = consumableCode(locationCode)
+        return code ~= nil and appliedLocations[code] == true
+    end
+
+    function progression.markLocationCollected(locationCode)
         if not locationCode then return end
-        apStorage.saveData.shopConsumedLocations[tostring(locationCode)] = true
+        collectedLocations[tostring(locationCode)] = true
+    end
+
+    function progression.isLocationCollected(locationCode)
+        return locationCode ~= nil and collectedLocations[tostring(locationCode)] == true
     end
 
     function progression.getBannedItems(itemName)

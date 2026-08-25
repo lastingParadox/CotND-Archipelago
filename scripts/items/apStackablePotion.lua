@@ -12,7 +12,10 @@ CustomEntities.extend({
         itemStackLimitQuantity = {
             limit = 3,
         },
-        itemStackQuantityLabelHUD = {},
+        -- A lone potion reads as the vanilla one, so only a real stack is numbered.
+        itemStackQuantityLabelHUD = {
+            minimumQuantity = 2,
+        },
         itemBlockDuplicatePickup = {},
     },
 })

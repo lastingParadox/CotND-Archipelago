@@ -1,4 +1,5 @@
 local apItemFactory = require("AP.scripts.items.apItemFactory")
+local progression = require("AP.scripts.client.progression")
 
 apItemFactory.define({
     name = "AP_GoldenLuteShard",
@@ -8,5 +9,10 @@ apItemFactory.define({
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
         normalAnimation = { frames = { 1, 2, 3, 4 } },
+    },
+    grant = {
+        item = "APGoldenLuteShard",
+        sound = "pickupGeneral",
+        apply = function() progression.addGoldenLuteShard() end,
     },
 })

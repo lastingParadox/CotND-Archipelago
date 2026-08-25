@@ -1,4 +1,24 @@
+local currentLevel = require "necro.game.level.CurrentLevel"
+local visualUpdate = require "necro.cycles.VisualUpdate"
+
 local apItemFactory = require("AP.scripts.items.apItemFactory")
+local progression = require("AP.scripts.client.progression")
+
+local function refreshLobby()
+    if currentLevel.isLobby() then visualUpdate.trigger() end
+end
+
+local function unlockZone(zone)
+    return function()
+        if zone > 0 then
+            progression.addZoneAccess(zone)
+        else
+            progression.addProgressiveZoneAccess()
+        end
+
+        refreshLobby()
+    end
+end
 
 apItemFactory.define({
     name = "AP_ProgressiveZoneAccess",
@@ -7,6 +27,11 @@ apItemFactory.define({
     flyaway = L("Progressive Zone Access Obtained!", "AP.item.accessKey.progressive.flyaway"),
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
+    },
+    grant = {
+        item = "APProgressiveZoneAccess",
+        sound = "shrineActivate",
+        apply = unlockZone(0),
     },
 })
 
@@ -18,6 +43,11 @@ apItemFactory.define({
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
     },
+    grant = {
+        item = "APZone1Access",
+        sound = "shrineActivate",
+        apply = unlockZone(1),
+    },
 })
 
 apItemFactory.define({
@@ -27,6 +57,11 @@ apItemFactory.define({
     flyaway = L("Zone 2 Access Obtained!", "AP.item.accessKey.zone2.flyaway"),
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
+    },
+    grant = {
+        item = "APZone2Access",
+        sound = "shrineActivate",
+        apply = unlockZone(2),
     },
 })
 
@@ -38,6 +73,11 @@ apItemFactory.define({
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
     },
+    grant = {
+        item = "APZone3Access",
+        sound = "shrineActivate",
+        apply = unlockZone(3),
+    },
 })
 
 apItemFactory.define({
@@ -47,6 +87,11 @@ apItemFactory.define({
     flyaway = L("Zone 4 Access Obtained!", "AP.item.accessKey.zone4.flyaway"),
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
+    },
+    grant = {
+        item = "APZone4Access",
+        sound = "shrineActivate",
+        apply = unlockZone(4),
     },
 })
 
@@ -58,6 +103,11 @@ apItemFactory.define({
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
     },
+    grant = {
+        item = "APZone5Access",
+        sound = "shrineActivate",
+        apply = unlockZone(5),
+    },
 })
 
 apItemFactory.define({
@@ -67,5 +117,13 @@ apItemFactory.define({
     flyaway = L("Character Room Key Obtained!", "AP.item.accessKey.characterRoom.flyaway"),
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
+    },
+    grant = {
+        item = "APCharRoomKey",
+        sound = "shrineActivate",
+        apply = function()
+            progression.unlockCharacterRoom()
+            refreshLobby()
+        end,
     },
 })

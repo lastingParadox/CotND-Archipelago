@@ -100,7 +100,9 @@ local function spawnAPLobbyShopItemForSlot(slotEntity)
     end
 
     itemData.args = itemData.args or {}
-    itemData.args["AP_shopItem"] = { slot = slotEntity }
+    itemData.args.AP_locationItem = itemData.args.AP_locationItem or {}
+    itemData.args.AP_locationItem.slot = slotEntity
+    itemData.args.AP_locationItem.locationCode = tostring(shopItem.LocationCode or "")
 
     if type(itemData.name) ~= "string" or itemData.name == "" then
         apLog("Invalid shop item type for NPC " .. slotEntity.AP_shopSlot.npc ..
@@ -147,121 +149,133 @@ local function spawnAPLobbyShopItemForSlot(slotEntity)
     )
 end
 
-local function spawnAPLobbyAltItemForSlot(slotEntity, npc)
-    local itemsList = progression.getItems()
-    if not (itemsList and next(itemsList)) then return end
+local UNSELLABLE = { "consumableHeal", "playableCharacter", "greetable", "itemLobbyProgressionUnlock", "AP_material" }
 
-    local slotList = npc == "Janitor" and janitorSlots or dealerSlots
+local ALT_NPCS = {
+    Janitor = {
+        seed = 10,
+        priceTag = "AP_PriceTagLobbyRemoveFromPool",
+        slots = function() return janitorSlots end,
+        excluded = function() return progression.getBannedItems() or {} end,
+        price = function() return 1 end,
+    },
+    Diamonddealer = {
+        seed = 20,
+        priceTag = "AP_PriceTagLobbyGrantOnce",
+        composites = true,
+        -- A material is a run-start item nobody can equip on its own.
+        unsellable = { "AP_material" },
+        slots = function() return dealerSlots end,
+        excluded = function() return progression.getNextRunItems() or {} end,
+        price = function(item)
+            local diamonds = (item.itemDiamondDealable and item.itemDiamondDealable.diamonds)
+                or (item.itemPrice and item.itemPrice.diamonds) or 1
+            return diamonds ~= 0 and diamonds or 5
+        end,
+    },
+}
 
-    -- Filter items: exclude consumables, characters, greetables
-    local items = {}
+local function sellable(proto, npc)
+    if not (proto and proto.item) then return false end
+
+    for _, component in ipairs(UNSELLABLE) do
+        if proto[component] then return false end
+    end
+
+    for _, component in ipairs(npc.unsellable or {}) do
+        if proto[component] then return false end
+    end
+
+    return true
+end
+
+-- Variants the player owns the makings of but not the weapon itself: a base shape they
+-- have, plus a material they have. Built from the base list, so composites of composites
+-- never arise.
+local function compositeWeapons(itemsList, bases, excluded)
+    local composites = {}
+
     for item in pairs(itemsList) do
-        local entity = ecs.getEntityPrototype(item)
-        if not (entity and entity.item) then goto continue end
-        if entity.consumableHeal or entity.playableCharacter or entity.greetable then goto continue end
-        -- Lobby upgrades are permanent and already granted; reselling them does nothing.
-        if entity.itemLobbyProgressionUnlock then goto continue end
+        local material = item:match("^AP_Material(.+)$")
 
-        -- Apply NPC-specific filtering
-        if npc == "Janitor" then
-            local bannedItemsList = progression.getBannedItems() or {}
-            if bannedItemsList[item] then goto continue end
-        elseif npc == "Diamonddealer" then
-            local nextRunItems = progression.getNextRunItems() or {}
-            if nextRunItems[item] then goto continue end
+        if material then
+            for _, base in ipairs(bases) do
+                local shape = base:match("^Weapon(.+)$")
+                local composite = shape and ("Weapon" .. material .. shape)
+                local proto = composite and not excluded[composite] and ecs.getEntityPrototype(composite)
 
-            -- Don't provide materials as run start items
-            if entity.AP_material then goto continue end
-        end
-
-        table.insert(items, item)
-        ::continue::
-    end
-
-    -- For Diamond Dealer: also include composite weapon variants (base weapon + unlocked material)
-    if npc == "Diamonddealer" then
-        local nextRunItems = progression.getNextRunItems() or {}
-        local baseCount = #items
-        for item in pairs(itemsList) do
-            local material = item:match("^AP_Material(.+)$")
-            if not material then goto continueComposite end
-            for i = 1, baseCount do
-                local shape = items[i]:match("^Weapon(.+)$")
-                if not shape then goto continueWeapon end
-                local composite = "Weapon" .. material .. shape
-                if not nextRunItems[composite] then
-                    local proto = ecs.getEntityPrototype(composite)
-                    if proto and proto.item then
-                        table.insert(items, composite)
-                    end
-                end
-                ::continueWeapon::
+                if proto and proto.item then composites[#composites + 1] = composite end
             end
-            ::continueComposite::
         end
     end
 
-    if #items == 0 then return end
+    return composites
+end
 
-    local function getItemSlotName(itemName)
-        local proto = ecs.getEntityPrototype(itemName)
-        return proto and proto.itemSlot and proto.itemSlot.name
-    end
+local function itemSlotName(itemName)
+    local proto = ecs.getEntityPrototype(itemName)
+    return proto and proto.itemSlot and proto.itemSlot.name
+end
 
-    -- Track both exact items and item slot types already used across this NPC's
-    -- slots, so the three slots spread across categories (one weapon, one head,
-    -- one spell, ...) instead of stacking duplicates of the same slot.
-    local alreadySpawned = {}
-    local usedSlots = {}
-    for _, spawnedItem in ipairs(slotList) do
-        alreadySpawned[spawnedItem] = true
-        local slotName = getItemSlotName(spawnedItem)
+-- Spread the NPC's slots across categories
+local function pickAltItem(candidates, npc)
+    local taken, usedSlots = {}, {}
+
+    for _, spawned in ipairs(npc.slots()) do
+        taken[spawned] = true
+        local slotName = itemSlotName(spawned)
         if slotName then usedSlots[slotName] = true end
     end
 
-    local npcSeed = npc == "Janitor" and 10 or 20
-    local channel = rng.makeChannel(rng.getDungeonSeed() + turn.getCurrentTurnID() + npcSeed)
-    local shuffled = rng.shuffle(items, channel)
+    local channel = rng.makeChannel(rng.getDungeonSeed() + turn.getCurrentTurnID() + npc.seed)
+    local fallback
 
-    -- Prefer an item whose slot type isn't represented yet; fall back to any
-    -- not-yet-spawned item so a slot is never left empty when only used-slot
-    -- categories remain.
-    local chosen = nil
-    local fallback = nil
-    for _, item in ipairs(shuffled) do
-        if not alreadySpawned[item] then
+    for _, item in ipairs(rng.shuffle(candidates, channel)) do
+        if not taken[item] then
             fallback = fallback or item
-            local slotName = getItemSlotName(item)
-            if not (slotName and usedSlots[slotName]) then
-                chosen = item
-                break
-            end
+            local slotName = itemSlotName(item)
+            if not (slotName and usedSlots[slotName]) then return item end
         end
     end
-    chosen = chosen or fallback
 
-    if not chosen then return end
+    return fallback
+end
 
-    table.insert(slotList, chosen)
+local function spawnAPLobbyAltItemForSlot(slotEntity, npcName)
+    local npc = ALT_NPCS[npcName]
+    local itemsList = progression.getItems()
+    if not (npc and itemsList and next(itemsList)) then return end
 
-    if type(chosen) ~= "string" or not ecs.typeHasComponent(chosen, "item") then
-        apLog("Invalid alt slot item for " .. npc .. ": " .. tostring(chosen), "warning")
-        return
+    local excluded = npc.excluded()
+    local candidates = {}
+
+    for item in pairs(itemsList) do
+        if not excluded[item] and sellable(ecs.getEntityPrototype(item), npc) then
+            candidates[#candidates + 1] = item
+        end
     end
 
+    if npc.composites then
+        for _, composite in ipairs(compositeWeapons(itemsList, candidates, excluded)) do
+            candidates[#candidates + 1] = composite
+        end
+    end
+
+    table.sort(candidates)
+
+    local chosen = pickAltItem(candidates, npc)
+    if not chosen then return end
+
+    table.insert(npc.slots(), chosen)
+
     local item = object.spawn(chosen, slotEntity.position.x, slotEntity.position.y,
-        { AP_shopItem = { slot = slotEntity } })
+        { AP_locationItem = { slot = slotEntity } })
     slotEntity.AP_shopSlot.item = item
     alignShopItemSprite(item)
 
-    local tagType = npc == "Janitor" and "AP_PriceTagLobbyRemoveFromPool" or "AP_PriceTagLobbyGrantOnce"
-    local price = npc == "Janitor" and 1 or (item.itemDiamondDealable and item.itemDiamondDealable.diamonds) or
-        (item.itemPrice and item.itemPrice.diamonds) or 1
-    if price == 0 then price = 5 end
-
-    item.sale.priceTag = object.spawn(tagType,
+    item.sale.priceTag = object.spawn(npc.priceTag,
         slotEntity.position.x, slotEntity.position.y,
-        { priceTagCostCurrency = { cost = price } }
+        { priceTagCostCurrency = { cost = npc.price(item) } }
     )
 end
 
@@ -276,7 +290,9 @@ local function spawnCodexItemForSlot(slotEntity)
     end
 
     itemData.args = itemData.args or {}
-    itemData.args["AP_shopItem"] = { slot = slotEntity }
+    itemData.args.AP_locationItem = itemData.args.AP_locationItem or {}
+    itemData.args.AP_locationItem.slot = slotEntity
+    itemData.args.AP_locationItem.locationCode = tostring(codexLocation.LocationCode or "")
 
     if type(itemData.name) ~= "string" or itemData.name == "" then
         apLog("Invalid codex item type for " .. tostring(slotEntity.AP_shopSlot.type) ..
@@ -329,7 +345,7 @@ local NPCHandlers = {
             if (progression.getCharacterLocations("ExpensivePurchase") or {})["Completed"] then return end
 
             local item = object.spawn("AP_VictoryItem", slot.position.x, slot.position.y, {
-                AP_shopItem = { slot = slot }
+                AP_locationItem = { slot = slot }
             })
             slot.AP_shopSlot.item = item
             alignShopItemSprite(item)
@@ -433,9 +449,9 @@ local function codexKeyToLocationName(codexKey)
 end
 
 
-event.objectUpdateTargetability.add("apShopItemNoTargeting", { order = "apply", filter = "AP_shopItem", sequence = -1 },
+event.objectUpdateTargetability.add("apShopItemNoTargeting", { order = "apply", filter = "AP_locationItem", sequence = -1 },
     function(ev)
-        if ev.entity.AP_shopItem.slot ~= 0 then
+        if ev.entity.AP_locationItem.slot ~= 0 then
             ev.targetable = false
 
             if (ev.entity.controllable.playerID ~= 0) then
@@ -446,11 +462,11 @@ event.objectUpdateTargetability.add("apShopItemNoTargeting", { order = "apply", 
 
 -- Item pickup event
 event.objectTryCollectItem.add("apPurchaseShopItem", { order = "priceTag", sequence = 1 }, function(ev)
-    if not (apClient.isSessionConnected() and ev.result == itemPickup.Result.SUCCESS and ev.item.AP_shopItem and ev.item.AP_shopItem.slot ~= 0) then
+    if not (apClient.isSessionConnected() and ev.result == itemPickup.Result.SUCCESS and ev.item.AP_locationItem and ev.item.AP_locationItem.slot ~= 0) then
         return
     end
 
-    local slot = ecs.getEntityByID(ev.item.AP_shopItem.slot)
+    local slot = ecs.getEntityByID(ev.item.AP_locationItem.slot)
     local npc = slot.AP_shopSlot.npc
     if npc == "Janitor" or npc == "Diamonddealer" then
         progression.changeDiamonds(-(ecs.getEntityByID(ev.item.sale.priceTag).priceTagCostCurrency.cost or 1))
@@ -460,8 +476,6 @@ event.objectTryCollectItem.add("apPurchaseShopItem", { order = "priceTag", seque
             object.delete(ev.item)
         elseif slot.AP_shopSlot.npc == "Diamonddealer" then
             progression.addNextRunItem(ev.item.name)
-            -- Equip the purchase right away on every lobby character that can use
-            -- it, so it shows as part of the starting inventory before the run.
             for _, playerEntity in ipairs(player.getPlayerEntities()) do
                 apInventory.equipNextRunItems(playerEntity, progression)
             end
@@ -498,7 +512,7 @@ event.objectTryCollectItem.add("apPurchaseShopItem", { order = "priceTag", seque
         locationName = npc .. " - " .. slot.AP_shopSlot.position .. " Shop Item " .. tostring(index)
     end
 
-    if not apLocationItem.consume(shopItem, locationName, ev.item.name) then return end
+    if not apLocationItem.consume(shopItem, locationName) then return end
 
     if ev.item.sale and ev.item.sale.priceTag ~= 0 then
         progression.changeDiamonds(-(ecs.getEntityByID(ev.item.sale.priceTag).priceTagCostCurrency.cost or 1))

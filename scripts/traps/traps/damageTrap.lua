@@ -2,10 +2,10 @@ local damage        = require("necro.game.system.Damage")
 local invincibility = require("necro.game.character.Invincibility")
 local player        = require("necro.game.character.Player")
 
+local APFlags        = require "AP.scripts.utils.flags"
 local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
 local TrapHandler    = require "AP.scripts.traps.trapHandler"
 
--- Spawn protection and i-frames suppress a TRAP hit outright.
 local function isProtected(entity)
     if entity.spawnInvincibility and entity.spawnInvincibility.active then return true end
     return invincibility.isActive(entity)
@@ -23,7 +23,7 @@ TrapHandler.register("DamageTrap", makeSimpleTrap({
         damage.inflict({
             victim     = entity,
             damage     = 1,
-            type       = damage.Type.TRAP,
+            type       = APFlags.DAMAGE_AP_TRAP,
             killerName = "Damage Trap",
         })
     end,

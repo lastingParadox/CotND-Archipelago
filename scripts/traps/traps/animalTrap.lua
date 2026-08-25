@@ -17,6 +17,20 @@ animalTrapPossessors = script.persist(function()
 	return animalTrapPossessors
 end)
 
+local MARV_CHANCE = 0.05
+
+event.entitySchemaLoadNamedEntity.add("apMarvPossessable", { key = "Marv" }, function(ev)
+	ev.entity.Sync_possessable = {}
+	ev.entity.Sync_possessableGlow = {}
+	ev.entity.Sync_possessableItemUser = {}
+	ev.entity.controllable = {}
+	ev.entity.inventory = {}
+	ev.entity.equipment = {}
+	ev.entity.invincibility = {}
+	ev.entity.invincibilityBlinkEffect = {}
+	ev.entity.beatDelay = {}
+end)
+
 local baseAnimals = {
 	"Bat",
 	"Bat2",
@@ -109,7 +123,11 @@ local function animalTrap(ev)
 
 	for _, entity in ipairs(player.getPlayerEntities()) do
 		if entity and entity.playableCharacter then
-			local transformed = tryTransformPlayer(entity, channel, pool)
+			local transformed = rng.roll(MARV_CHANCE, channel)
+				and tryTransformPlayer(entity, channel, { "Marv" })
+
+			transformed = transformed or tryTransformPlayer(entity, channel, pool)
+
 			if transformed then
 				transformedAny = true
 				apFlyaways.addToFlyawayQueue({

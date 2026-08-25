@@ -4,7 +4,7 @@ local turn = require "necro.cycles.Turn"
 local apFlyaways = {}
 local queue = {}
 local activeByEntity = {}
-local OPACITY_THRESHOLD = 1.25
+local OPACITY_THRESHOLD = 1.55
 
 queue = script.persist(function()
     return queue
@@ -43,6 +43,7 @@ end
 
 function apFlyaways.addToFlyawayQueue(flyawayData)
     local turnID = turn.getActiveTurnID()
+
     if turnID then
         local key = table.concat({
             turnID,

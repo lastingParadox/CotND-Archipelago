@@ -92,11 +92,11 @@ for _, name in ipairs(variantNames) do
     })
 end
 
-TrapHandler.register("CameraTrap", function(ev, args)
+TrapHandler.register("CameraTrap", function(ev, args, ticket)
     local variant = args and args.variant
     if not (variant and trapFns[variant]) then
         local channel = rng.makeChannel(currentLevel.getSeed() + turn.getCurrentTurnID())
         variant = rng.choice(variantNames, channel)
     end
-    return trapFns[variant](ev)
+    return trapFns[variant](ev, args, ticket)
 end)

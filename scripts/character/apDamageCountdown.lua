@@ -1,10 +1,9 @@
 local currentLevel = require("necro.game.level.CurrentLevel")
 local damage = require("necro.game.system.Damage")
+local flyaway = require("necro.game.system.Flyaway")
 local gameDLC = require "necro.game.data.resource.GameDLC"
 local sound = require("necro.audio.Sound")
 local ecs = require("system.game.Entities")
-
-local apFlyaways = require("AP.scripts.ui.apFlyaways")
 
 local damageCountdownFlyaways = {
     texts = {
@@ -79,10 +78,11 @@ event.turn.add("apReduceDamageCountdown", "damageCountdown", function(ev)
                 entity.AP_damageCountdown.countdown = entity.AP_damageCountdown.countdownReset
             end
 
-            apFlyaways.addToFlyawayQueue({
-                entity = entity,
-                text = damageCountdownFlyaways.texts[countdown]
-            })
+            local text = damageCountdownFlyaways.texts[countdown]
+
+            if text then
+                flyaway.create({ entity = entity, text = text })
+            end
 
             local soundEntry = getDamageCountdownSound(entity, countdown)
 

@@ -34,6 +34,11 @@ function apStorage.ensureSaveDataTables()
     end
 end
 
+-- Straight away, not just once a session starts: connecting moves the players before the
+-- State packet lands, and anything that fires in between -- a level completing, a check
+-- being recorded -- reads these tables and would otherwise find nil.
+apStorage.ensureSaveDataTables()
+
 function apStorage.initSession(seedName, playerName, slot)
     apStorage.saveData = {}
     trapHandler.clearTraps()

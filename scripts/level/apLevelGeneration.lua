@@ -11,7 +11,6 @@ local stateControl = require("necro.client.StateControl")
 local apCharacters = require("AP.scripts.utils.apCharacters")
 local apClient = require("AP.scripts.client.client")
 local apFlags = require("AP.scripts.utils.flags")
-local apReplay = require("AP.scripts.utils.apReplay")
 local apUtils = require("AP.scripts.utils.apUtils")
 local progression = require("AP.scripts.client.progression")
 
@@ -39,23 +38,11 @@ end)
 
 event.levelSequenceUpdate.add("apFilterAccessibleZones", { order = "initAllZones", sequence = 1 }, function(ev)
     if ev.mode.id ~= "APAllZones" then return end
-    local zoneAccessMode = progression.getZoneAccessKeys()
-    if zoneAccessMode == 0 then return end
+    if progression.getZoneAccessKeys() == "disabled" then return end
 
-    local startingZone = progression.getStartingZone()
     local accessible = {}
-
-    if zoneAccessMode == 2 then
-        local unlocked = startingZone + progression.getProgressiveZoneAccessCount()
-        for i = 1, math.min(unlocked, #ev.zones) do
-            accessible[ev.zones[i]] = true
-        end
-    else
-        for _, zone in ipairs(ev.zones) do
-            if zone == startingZone or progression.hasZoneAccess(zone) then
-                accessible[zone] = true
-            end
-        end
+    for _, zone in ipairs(progression.getAccessibleZones(ev.zones)) do
+        accessible[zone] = true
     end
 
     local storyZoneUnlocked = false
@@ -152,23 +139,12 @@ event.levelLoad.add("addDiamondTiles", { order = "tileMap" }, function(ev)
     end
 end)
 
-event.objectTryCollectItem.add("pickupAPCurrency", { order = "checkItem" }, function(ev)
-    if not apUtils.isAPContext(ev.entity) then return end
-    if ev.item.AP_shopItem and ev.item.AP_shopItem.slot ~= 0 then return end
-    if ev.item.itemCurrency and ev.item.itemCurrency.currencyType == apFlags.CURRENCY_AP_DIAMOND then
-        -- saveData sits outside the snapshot, so a replayed pickup banks twice.
-        if apReplay.firstThisTurn("diamond:" .. ev.item.id) then
-            progression.changeDiamonds(ev.item.itemStack.quantity)
-        end
-    end
-end)
-
 event.objectDeath.add("apDeathlinkTrigger", { order = "kill", sequence = 1, filter = "controllable" },
     function(ev)
         if ev.entity.controllable.playerID == 0 or instantReplay.isActive() or replayPlayer.isActive() or gameSession.hasPendingTransition() then return end
         if not apCharacters.isCharacter(ev.entity.name) then return end
         if (apClient.isConnected() and progression.getDeathlink() and ev.damageType ~= apFlags.DAMAGE_DEATH_LINK and (ev.killerName or (ev.attacker and ev.attacker.friendlyName.name))) then
-            if progression.getDeathlinkTrigger() == "Game Over" and player.getLiveCount() > 1 then
+            if progression.getDeathlinkTrigger() == "Game Over" and player.getLiveCount() > 0 then
                 return
             end
             local killerName = ev.killerName or ev.attacker.friendlyName.name

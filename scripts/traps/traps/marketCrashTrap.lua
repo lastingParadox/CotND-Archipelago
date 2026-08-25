@@ -15,7 +15,7 @@ local function closeShops()
     local skipped = 0
 
     for item in ecs.entitiesWithComponents({ "sale" }) do
-        if item.AP_shopItem and item.AP_shopItem.slot ~= 0 then
+        if item.AP_locationItem and item.AP_locationItem.slot ~= 0 then
             -- AP shop slots are location checks, not stock. Leave them alone.
         elseif item.position and item.sale.priceTag ~= 0 and not (item.item and item.item.equipped) then
             saleItems[#saleItems + 1] = item

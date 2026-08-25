@@ -3,47 +3,12 @@ local progression = require "necro.game.system.Progression"
 
 local apFlags = require("AP.scripts.utils.flags")
 
+-- Anything that can hold diamonds can hold AP diamonds.
 event.entitySchemaLoadEntity.add("addAPDiamondCounter", { order = "overrides" }, function(ev)
     if ev.entity.diamondCounter ~= nil then
         ev.entity.AP_diamondCounter = {}
     end
 end)
-
--- Register AP_ResourceDiamond items (denominations 1-4)
-for i = 1, 4 do
-    customEntities.extend({
-        name = "AP_ResourceDiamond" .. tostring(i),
-        template = customEntities.template.item(),
-        data = { slot = "misc" },
-        components = {
-            itemCurrency = {
-                currencyType = apFlags.CURRENCY_AP_DIAMOND,
-            },
-            itemStack = {
-                quantity = i,
-                mergeKey = apFlags.CURRENCY_AP_DIAMOND,
-            },
-            itemStackMergeOnPickup = {},
-            itemCurrencyConvertible = {},
-            itemHintLabel = {
-                text = i == 1 and "1 Diamond" or (tostring(i) .. " Diamonds"),
-            },
-            itemPickupSound = {
-                sound = "pickupDiamond",
-            },
-            sprite = {
-                texture = "ext/items/resource_diamond" .. (i == 1 and "" or tostring(i)) .. '.png',
-                width = 24,
-                height = 24,
-            },
-            diamondPickupAnimation = {},
-            AP_flyaway = {
-                text = i == 1 and "1 Diamond" or (tostring(i) .. " Diamonds"),
-            },
-            AP_editorCategory = {},
-        },
-    })
-end
 
 -- Register AP price tag entities for lobby shop items
 local apLobbyPriceTag = {

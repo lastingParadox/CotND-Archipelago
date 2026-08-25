@@ -8,6 +8,7 @@ gameSession.Mode.extend(
         name = "AP Single Zone",
         cutscenes = true,
         depthPriceMultiplier = false,
+        bossFlawlesses = true,
         diamondCounter = true,
         generatorOptions = {
             type = "Necro",

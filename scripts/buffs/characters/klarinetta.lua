@@ -13,8 +13,7 @@ event.itemGenerate.add("apKlarinettaBuffZweihanderPool", {
     local baseFilter = ev.filter
     ev.filter = function(item, args, player)
         if player and player.name == "Sync_Klarinetta" then
-            local isZweihander = item.Sync_weaponCollisionCheck
-                and item.name and item.name:find("Zweihander", 1, true)
+            local isZweihander = item.Sync_weaponCollisionCheck ~= nil
             local isScroll = item.AP_klarinettaWeaponScroll ~= nil
             if isZweihander or isScroll then
                 return hasBuff and true or false
@@ -31,8 +30,7 @@ event.itemBanCheck.add("apKlarinettaBuffZweihanderUnban", {
     sequence = 1,
 }, function(ev)
     if ev.holder.name ~= "Sync_Klarinetta" then return end
-    if not (ev.item.Sync_weaponCollisionCheck
-        and ev.item.name and ev.item.name:find("Zweihander", 1, true)) then return end
+    if not ev.item.Sync_weaponCollisionCheck then return end
     ev.mask = 0
 end)
 
@@ -44,8 +42,7 @@ event.objectTryCollectItem.add("apKlarinettaBuffPickupCheck", {
     if ev.entity.name ~= "Sync_Klarinetta" then return end
     if ev.result == itemPickup.Result.NONE then return end
 
-    local isZweihander = ev.item.Sync_weaponCollisionCheck
-        and ev.item.name and ev.item.name:find("Zweihander", 1, true)
+    local isZweihander = ev.item.Sync_weaponCollisionCheck ~= nil
     local isScroll = ev.item.AP_klarinettaWeaponScroll ~= nil
 
     if not (isZweihander or isScroll) then return end

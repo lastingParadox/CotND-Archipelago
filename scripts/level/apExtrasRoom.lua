@@ -12,6 +12,7 @@ local settingsStorage = require "necro.config.SettingsStorage"
 local tile = require "necro.game.tile.Tile"
 local tileTypes = require "necro.game.tile.TileTypes"
 
+local apLog = require("AP.scripts.utils.log").apLog
 local apUtils = require("AP.scripts.utils.apUtils")
 
 local apExtrasRoom = {}
@@ -22,8 +23,7 @@ local queued = {}
 local estimators = {}
 local estimatorNames = {}
 
----Registers how many rooms a floor will want. Called once per non-boss level entry
----at run start, so it must answer from the run seed rather than the current level.
+---Registers how many rooms a floor will want
 ---@param name string
 ---@param estimate function (entry, ev) -> count, where entry carries zone and floor.
 function apExtrasRoom.demand(name, estimate)
@@ -55,6 +55,7 @@ end)
 
 local LOOT_COMPONENTS = { "item", "storage", "shrine" }
 local NEIGHBOURS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+local SIDES = 4
 local CLOSET_SIZES = { { 3, 3 }, { 3, 2 }, { 2, 3 }, { 2, 2 } }
 local FLOOR_TILE = "Floor"
 local WALL_TILE = "DirtWall"
@@ -73,7 +74,7 @@ local SPIKE_CHANCE_SETTING = "mod.Sync.levelGeneration.spikeWallChance"
 local SPIKE_CHANCE_DEFAULT = 0.08
 
 -- Synchrony spikes a whole connected stone wall at this rate, and a closet's shell
--- is one such wall. Reading its setting keeps the two in step when it is retuned.
+-- is one such wall
 local function spikeShell(x, y, width, height, channel)
     if not ecs.getEntityPrototype(WALL_SPIKE) then return end
     if not currentLevel.isRegularFloor() then return end
@@ -94,16 +95,16 @@ local function spikeShell(x, y, width, height, channel)
     end
 end
 
--- The schema's "wall"/"floor" type is a build-time key and is not on the tile info
--- at runtime; the collision mask is, and Collision.updateTile reads it the same way.
 local function isWall(info)
     return bit.band(info.collision or 0, collision.Type.WALL) ~= 0
 end
 
--- Anything that is not walkable is space to build in, void included: the unused
--- margin of a level is empty tiles rather than rock, and it is the largest place a
--- closet can go. Hardness decides nothing either, since these tiles are replaced
--- outright rather than dug.
+-- The level's own edge: LevelBorder and the boss walls
+local function isBorder(info)
+    return bit.band(info.collision or 0, collision.Type.BORDER) ~= 0
+end
+
+-- Anything that is not walkable is space to build in, void included
 local function isSpace(x, y)
     if not tile.exists(x, y) then return true end
 
@@ -111,10 +112,6 @@ local function isSpace(x, y)
     return isWall(info) and not SHOP_WALLS[info.name]
 end
 
--- The shell is only required to be space, so a closet may share a wall with a
--- generated room. Its interior may not, or the two would open into each other.
--- No dig-content test on the shell either: buried gold is common enough that ruling
--- out all sixteen surrounding tiles would leave most floors with nowhere to carve.
 local function isCarvable(x, y)
     if not isSpace(x, y) or placementUtils.getRoomAt(x, y) then return false end
 
@@ -124,9 +121,7 @@ local function isCarvable(x, y)
         and not objectMap.get(x, y)
 end
 
--- A later closet may share a wall with an earlier one, but must never carve into it:
--- its interior has to clear both the earlier floor and the shell holding it in, while
--- its own shell only has to clear that floor.
+-- A later closet may share a wall with an earlier one, but must never carve into it
 local claimedFloor = {}
 local claimedShell = {}
 
@@ -135,9 +130,7 @@ local SECRET_ROOMS = {
     [proceduralLevel.RoomType.SECRET_SHOP] = true,
 }
 
--- Only floor the player can already walk to counts as a way in. A closet reached by
--- digging into another closet is not found, it is stumbled into from a room that is
--- itself hidden, so the pair stays sealed off from the level.
+-- Only floor the player can already walk to counts as a way in
 local function isOpenFloor(x, y, index)
     if claimedFloor[index] then return false end
 
@@ -146,9 +139,7 @@ local function isOpenFloor(x, y, index)
     return not (room and SECRET_ROOMS[room.type])
 end
 
--- Void comes in two kinds: the level's outer margin, and pockets sealed inside its
--- own geometry. Only the first is "outside" -- flooding in from the segment edge is
--- what tells them apart, since a pocket is unreachable from there.
+-- Void comes in two kinds: the level's outer margin, and pockets inside
 local function floodOuterVoid(survey, minX, minY, width, height)
     local outer, stack = {}, {}
 
@@ -238,32 +229,42 @@ end
 
 ---@return boolean fits, boolean usesVoid  usesVoid marks a site out in the level's
 ---outer margin. Void enclosed by the level counts as inside it.
+---@return boolean fits
+---@return boolean usesVoid  Marks a site out in the level's outer margin.
+---@return integer sides  How many of the closet's four edges a dig can enter from.
 local function closetFits(x, y, width, height, survey)
-    local enterable, usesVoid = false, false
+    local usesVoid = false
+    local reached = {}
 
     for cx = x - 1, x + width do
         for cy = y - 1, y + height do
             local index = tile.reduceCoordinates(cx, cy)
-            if not index or claimedFloor[index] then return false, false end
+            if not index or claimedFloor[index] then return false, false, 0 end
 
             local inside = cx >= x and cx < x + width
                 and cy >= y and cy < y + height
 
             if inside then
-                if claimedShell[index] then return false, false end
-                if not survey.carvable[index] then return false, false end
+                if claimedShell[index] then return false, false, 0 end
+                if not survey.carvable[index] then return false, false, 0 end
             else
-                if not survey.space[index] then return false, false end
+                if not survey.space[index] then return false, false, 0 end
 
                 -- Corners do not count: one only touches the interior diagonally, so
                 -- digging it opens into nothing and the closet is two digs deep.
+                local side = (cx == x - 1 and "left")
+                    or (cx == x + width and "right")
+                    or (cy == y - 1 and "top")
+                    or (cy == y + height and "bottom")
                 local corner = (cx == x - 1 or cx == x + width)
                     and (cy == y - 1 or cy == y + height)
 
-                if not corner then
+                if side and not corner then
                     for _, step in ipairs(NEIGHBOURS) do
                         local neighbour = tile.reduceCoordinates(cx + step[1], cy + step[2])
-                        enterable = enterable or (neighbour ~= nil and survey.floor[neighbour] == true)
+                        if neighbour ~= nil and survey.floor[neighbour] == true then
+                            reached[side] = true
+                        end
                     end
                 end
             end
@@ -272,13 +273,14 @@ local function closetFits(x, y, width, height, survey)
         end
     end
 
-    return enterable, usesVoid
+    local sides = 0
+    for _ in pairs(reached) do sides = sides + 1 end
+
+    return sides > 0, usesVoid, sides
 end
 
 -- Every placement of every size, split by whether it needs the level's empty
--- margin. Sizes are kept apart so the pick can be even across them: a 2x2 fits in
--- far more places than a 3x3, and pooling them would nearly always yield the small
--- one, the same way trying sizes in order always yielded the large one.
+-- margin.
 local function findSpots(minX, minY, width, height, survey)
     local inside, outside = {}, {}
 
@@ -286,14 +288,14 @@ local function findSpots(minX, minY, width, height, survey)
         -- Two tiles of margin, so the backing ring stays inside the segment.
         for x = minX + 2, minX + width - size[1] - 2 do
             for y = minY + 2, minY + height - size[2] - 2 do
-                local fits, usesVoid = closetFits(x, y, size[1], size[2], survey)
+                local fits, usesVoid, sides = closetFits(x, y, size[1], size[2], survey)
 
                 if fits then
                     local pool = usesVoid and outside or inside
                     pool[sizeIndex] = pool[sizeIndex] or {}
 
                     local spots = pool[sizeIndex]
-                    spots[#spots + 1] = { x, y, size[1], size[2] }
+                    spots[#spots + 1] = { x, y, size[1], size[2], sides = sides }
                 end
             end
         end
@@ -302,18 +304,7 @@ local function findSpots(minX, minY, width, height, survey)
     return inside, outside
 end
 
-local function countSpots(pool)
-    local total, shapes = 0, 0
-
-    for _, spots in pairs(pool) do
-        total = total + #spots
-        shapes = shapes + 1
-    end
-
-    return total, shapes
-end
-
--- Centres of the closets already carved on this floor, so the next one can be put
+-- Centers of the closets already carved on this floor, so the next one can be put
 -- somewhere else first.
 local carvedCentres = {}
 local MIN_SEPARATION = 12
@@ -331,10 +322,7 @@ local function farFromCarved(spot)
 end
 
 -- Spread first, centre second: spots away from the closets already carved are
--- preferred outright, and the pull inward is only a bias within whatever is left.
--- Nearest half rather than the single closest, so the choice still moves around
--- between seeds. Ties break on position, since table.sort is not stable and clients
--- would otherwise disagree.
+-- preferred outright, and the pull inward is only a bias within whatever is left
 local function nearestToCentre(spots, centreX, centreY, channel)
     local scored = {}
 
@@ -365,14 +353,28 @@ local function nearestToCentre(spots, centreX, centreY, channel)
     return scored[rng.int(keep, channel) + 1].spot
 end
 
-local function pickSpot(pool, centreX, centreY, channel)
-    local sizeIndices = {}
-    for sizeIndex in pairs(pool) do sizeIndices[#sizeIndices + 1] = sizeIndex end
+-- Only the spots a dig can reach from exactly `tier` sides, size by size
+local function pickSpot(pool, centreX, centreY, channel, tier)
+    local openest, sizeIndices = {}, {}
+
+    for sizeIndex, spots in pairs(pool) do
+        local kept = {}
+
+        for _, spot in ipairs(spots) do
+            if (spot.sides or 1) == tier then kept[#kept + 1] = spot end
+        end
+
+        if #kept > 0 then
+            openest[sizeIndex] = kept
+            sizeIndices[#sizeIndices + 1] = sizeIndex
+        end
+    end
+
     if #sizeIndices == 0 then return nil end
 
     table.sort(sizeIndices)
 
-    local spots = pool[sizeIndices[rng.int(#sizeIndices, channel) + 1]]
+    local spots = openest[sizeIndices[rng.int(#sizeIndices, channel) + 1]]
     return nearestToCentre(spots, centreX, centreY, channel)
 end
 
@@ -382,8 +384,6 @@ local function carveCloset(channel)
     local survey = surveyRock(minX, minY, width, height)
     local zoneID = survey.zoneID
 
-    -- Resolved from the level's own tiles: a void tile reports no zone, and
-    -- tile.setType would look one up per tile and error when it finds none.
     local floorID = tileTypes.lookUpTileID(FLOOR_TILE, zoneID)
         or tileTypes.lookUpTileID(FLOOR_TILE, 0)
     local wallID = tileTypes.lookUpTileID(WALL_TILE, zoneID)
@@ -393,24 +393,36 @@ local function carveCloset(channel)
 
     local inside, outside = findSpots(minX, minY, width, height, survey)
 
-    local insideCount, insideShapes = countSpots(inside)
-    local outsideCount = countSpots(outside)
-
-    -- The level's own rock first; the margin is where a closet ends up looking
-    -- bolted on rather than part of the floor.
+    -- Findability first, and only then the level's own rock over its margin
     local centreX = minX + width / 2
     local centreY = minY + height / 2
-    local spot = pickSpot(inside, centreX, centreY, channel)
-        or pickSpot(outside, centreX, centreY, channel)
+    local spot, pool
+
+    for tier = SIDES, 1, -1 do
+        pool = "interior"
+        spot = pickSpot(inside, centreX, centreY, channel, tier)
+
+        if not spot then
+            pool = "margin"
+            spot = pickSpot(outside, centreX, centreY, channel, tier)
+        end
+
+        if spot then break end
+    end
 
     if not spot then return end
 
     local x, y, w, h = spot[1], spot[2], spot[3], spot[4]
 
-    -- Dirt whatever the surrounding rock was, so it is diggable from any side.
+    -- Only what a shovel cannot get through is replaced: boundary rock, and the void
     for cx = x - 1, x + w do
         for cy = y - 1, y + h do
-            tile.set(cx, cy, wallID)
+            local interior = cx >= x and cx < x + w
+                and cy >= y and cy < y + h
+
+            if not interior and (not tile.exists(cx, cy) or isBorder(tile.getInfo(cx, cy))) then
+                tile.set(cx, cy, wallID)
+            end
         end
     end
 
@@ -420,8 +432,8 @@ local function carveCloset(channel)
         end
     end
 
-    -- Void behind the shell would let a dig open onto nothing, so back it with the
-    -- level's own border rock.
+    -- Anything just converted has to be backed, or a dig through it opens onto the void
+    -- it used to be.
     for cx = x - 2, x + w + 1 do
         for cy = y - 2, y + h + 1 do
             local beyondShell = cx < x - 1 or cx > x + w

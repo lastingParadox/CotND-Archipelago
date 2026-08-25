@@ -41,12 +41,24 @@ local function attach(progression)
         return blacklist
     end
 
+    -- "item_only", "required_items_soft", or "required_items_hard".
     function progression.getCharacterUnlocks()
-        return apStorage.saveData.characterUnlocks
+        return apStorage.saveData.characterUnlocks or "item_only"
+    end
+
+    function progression.requiresCharacterItems()
+        return progression.getCharacterUnlocks() ~= "item_only"
     end
 
     function progression.getIncludeUniqueItems()
         return apStorage.saveData.includeUniqueItems
+    end
+
+    -- { normal = { "CharmNazar", ... }, unique = { ... } } for one CotND character, already
+    -- stripped of anything this slot's DLC leaves out of the pool.
+    function progression.getCharacterRequirements(name)
+        local requirements = apStorage.saveData.characterRequirements or {}
+        return requirements[name] or {}
     end
 
     function progression.hasCharacterRoomKey()

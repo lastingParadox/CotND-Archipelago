@@ -6,5 +6,5 @@ handlers.register("Trap", function(message)
     local name = message.trap_name
     if type(name) ~= "string" or name == "" then return end
     apLog("Queuing TrapLink trap: " .. name)
-    trapHandler.queueTrap(name, message.args)
+    trapHandler.publishTrap(name, message.args)
 end)

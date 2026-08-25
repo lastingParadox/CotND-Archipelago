@@ -1,8 +1,12 @@
 local ecs = require("system.game.Entities")
 local rng = require "necro.game.system.RNG"
 
+local apGrants = require("AP.scripts.items.apGrants")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
+local apItems = require("AP.scripts.utils.apItems")
+local apUtils = require("AP.scripts.utils.apUtils")
 local progression = require("AP.scripts.client.progression")
+local trapHandler = require("AP.scripts.traps.trapHandler")
 
 apItemFactory.define({
     name = "AP_trap",
@@ -90,9 +94,6 @@ end
 
 local METHODS = { "homoglyph", "swap", "vowel", "double" }
 
--- Rotates rather than shuffles: rng.shuffle mutates its argument, and METHODS
--- is shared. Falling through keeps a method that cannot apply to this name from
--- leaving it spelled correctly.
 local function getMisspelledName(name, channel)
     if not name or #name < 2 then
         return name
@@ -110,43 +111,37 @@ local function getMisspelledName(name, channel)
 end
 
 
-local DISGUISE_SPRITE_FIELDS = {
-    "texture", "width", "height", "textureShiftX", "textureShiftY", "scale", "color",
-}
-
 event.objectSpawn.add("APTrapSprite", { order = "overrides", filter = "AP_trapItem" }, function(ev)
     local trapEntity = ev.entity
     local itemEntities = {}
 
     for _, type in ipairs(ecs.getEntityTypesWithComponents({ "item" })) do
         local entity = ecs.getEntityPrototype(type)
-        if not (entity.playableCharacter or entity.lobbyImmunity or entity.itemLobbyProgressionUnlock) and entity.sprite then
+        if not (entity.playableCharacter or entity.lobbyImmunity
+                or entity.itemLobbyProgressionUnlock or entity.AP_item)
+            and entity.sprite
+        then
             table.insert(itemEntities, entity)
         end
     end
 
-    local seedName = progression.getSeedName() or "0"
-    local locationCode = tostring(trapEntity.AP_trapItem.locationCode or "0")
-    local seedStr = seedName .. "-" .. locationCode
+    local channel = apUtils.hashChannel(
+        progression.getSeedName() or "0",
+        tostring(trapEntity.AP_trapItem.locationCode or "0")
+    )
 
-    -- rng.makeChannel requires a number; hash the string seed into one.
-    local channelSeed = 0
-    for i = 1, #seedStr do
-        channelSeed = (channelSeed * 31 + string.byte(seedStr, i)) % 2147483647
-    end
-
-    local channel = rng.makeChannel(channelSeed)
     local chosen = rng.shuffle(itemEntities, channel)[1]
+    local label = apItemFactory.disguise(trapEntity, chosen)
 
-    -- Only what the disguise looks like. x/y are live render coordinates and
-    -- mirrorX/visible are per-instance state, so copying the whole component
-    -- would hand the trap another entity's position.
-    for _, field in ipairs(DISGUISE_SPRITE_FIELDS) do
-        trapEntity.sprite[field] = chosen.sprite[field]
-    end
-
-    local label = (chosen.itemHintLabel and chosen.itemHintLabel.text) or (chosen.friendlyName and chosen.friendlyName.name)
-    local misspelled = getMisspelledName(label, channel)
-
-    trapEntity.AP_hintLabel = { text = misspelled }
+    trapEntity.AP_hintLabel = { text = getMisspelledName(label, channel) }
 end)
+
+-- Every trap id, since the apworld names them rather than listing them. Fired on arrival,
+-- falling back to the queue only for a trap the run cannot take yet.
+apGrants.defineFamily({
+    order = 10,
+    match = function(itemId) return apItems.isTrapItem(itemId) end,
+    apply = function(_, _, ctx)
+        trapHandler.deliver(ctx.item.item, nil, ctx.ev)
+    end,
+})

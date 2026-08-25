@@ -1,9 +1,16 @@
 local match = string.match
 
 local apLog = require("AP.scripts.utils.log").apLog
+local apShrines = require("AP.scripts.entities.apShrines")
 local apStorage = require("AP.scripts.client.storage")
 local handlers = require("AP.scripts.client.initHandlers")
 local progression = require("AP.scripts.client.progression")
+
+-- Keyed by location name, since the server's lists carry those rather than entity names.
+local SHRINE_LOCATION_NAMES = {}
+for _, location in pairs(apShrines.SHRINE_LOCATIONS) do
+    SHRINE_LOCATION_NAMES[location] = true
+end
 
 local PATTERNS = {
     SHOP       = "^(.-) %- (%a+) Shop Item (%d+)$",
@@ -53,6 +60,13 @@ local function matchCharacterZone(location, saveData)
 end
 
 local function parseLocation(location, saveData)
+    if SHRINE_LOCATION_NAMES[location] then
+        return {
+            type = "shrine",
+            location = location,
+        }
+    end
+
     local shop, side, item = match(location, PATTERNS.SHOP)
     if shop then
         return {
@@ -91,6 +105,15 @@ local function parseMissingLocations(saveData, missing_locations)
             goto continue
         end
 
+        if parsed.type == "shrine" then
+            local shrines = saveData.characterLocations["Shrines"] or {}
+            if shrines[parsed.location] == nil then
+                shrines[parsed.location] = false
+            end
+            saveData.characterLocations["Shrines"] = shrines
+            goto continue
+        end
+
         if parsed.type == "character" then
             local zone = parsed.zone
             -- Floor checks carry no zone key, so there is nothing to seed for them.
@@ -116,6 +139,13 @@ local function updateLocations(saveData, checked_locations)
     for _, location in ipairs(checked_locations) do
         local parsed = parseLocation(location, saveData)
         if not parsed then
+            goto continue
+        end
+
+        if parsed.type == "shrine" then
+            local shrines = character_locations["Shrines"] or {}
+            shrines[parsed.location] = true
+            character_locations["Shrines"] = shrines
             goto continue
         end
 

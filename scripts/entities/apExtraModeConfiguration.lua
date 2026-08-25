@@ -1,5 +1,6 @@
 local components = require "necro.game.data.Components"
 local currentLevel = require "necro.game.level.CurrentLevel"
+local customEntities = require "necro.game.data.CustomEntities"
 local ecs = require("system.game.Entities")
 local extraMode = require "necro.game.data.modifier.ExtraMode"
 local flyaway = require "necro.game.system.Flyaway"
@@ -7,6 +8,7 @@ local focus = require "necro.game.character.Focus"
 local lobbyEffects = require "necro.render.level.LobbyEffects"
 local sound = require "necro.audio.Sound"
 local trapClientTrigger = require "necro.game.trap.TrapClientTrigger"
+local worldLabel = require "necro.game.system.WorldLabel"
 
 local apPreview = require("AP.scripts.utils.apPreview")
 
@@ -14,6 +16,42 @@ local apClient = require("AP.scripts.client.client")
 local progression = require("AP.scripts.client.progression")
 
 local hasPendingRunStart = false
+
+local INIT_TEXT = "label.lobby.extraMode.init"
+
+customEntities.register({
+    name = "AP_LabelExtraModeInfo",
+    position = {},
+    worldLabel = {},
+    worldLabelFade = {},
+    worldLabelTextPool = { key = INIT_TEXT },
+    worldLabelMaxWidth = { width = 120 },
+    AP_extraModeLabel = {},
+})
+
+local function updateModeLabels(modeEntity, i18nKey)
+    local nearest, nearestDistance
+
+    for label in ecs.entitiesWithComponents({ "AP_extraModeLabel", "position" }) do
+        label.worldLabelFade.maxDistance = 0
+
+        if i18nKey then
+            label.worldLabelTextPool.key = i18nKey
+            worldLabel.update(label)
+        end
+
+        local distance = math.abs(label.position.y - modeEntity.position.y)
+
+        if not nearest or distance < nearestDistance then
+            nearest, nearestDistance = label, distance
+        end
+    end
+
+    if nearest and i18nKey then
+        nearest.worldLabelFade.falloff = 0.0001
+        nearest.worldLabelFade.maxDistance = 10000
+    end
+end
 
 event.entitySchemaLoadNamedEntity.add("shrineOfConfigurationAP", { key = "ShrineOfConfiguration" }, function(ev)
     ev.entity.AP_interactable = { ["ap"] = false, ["active"] = false }
@@ -96,6 +134,8 @@ local function tryToggleAPExtraMode(playerEntity, modeEntity, explosive)
 
         modeEntity.interactableToggleExtraMode.active = active
         modeEntity.AP_interactable.active = active
+
+        updateModeLabels(modeEntity, active and extraMode.Type.data[modeID].descriptionI18n or nil)
 
         if trapClientTrigger.checkClientTrigger(playerEntity, modeEntity) then
             extraMode.setActive(modeID, active)

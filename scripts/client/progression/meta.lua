@@ -28,6 +28,13 @@ local function attach(progression)
         return apStorage.saveData.zoneProgressFloors or { [2] = true }
     end
 
+    -- Minutes an AP Zones Mode run must finish within for this character's All Zones
+    -- check to send. 0 is untimed, which covers saves from before the option existed.
+    function progression.getSpeedrunTime(character)
+        local times = apStorage.saveData.speedrunTimes or {}
+        return times[character] or 0
+    end
+
     function progression.getEnabledDLCs()
         return apStorage.saveData.enabledDLCs
     end
@@ -51,17 +58,17 @@ local function attach(progression)
         return apStorage.saveData.itemRoom or {}
     end
 
-    function progression.getChestChecks()
-        return apStorage.saveData.chestChecks == true
+    function progression.getItemChecks()
+        return apStorage.saveData.itemChecks == true
     end
 
     function progression.getFlawlessChestChecks()
         return apStorage.saveData.flawlessChestChecks == true
     end
 
-    -- Percent chance an opened chest carries its zone's check rather than its loot.
-    function progression.getChestCheckChance()
-        return apStorage.saveData.chestCheckChance or 50
+    -- Percent chance an acquisition carries its zone's check rather than its own loot.
+    function progression.getItemChance()
+        return apStorage.saveData.itemChance or 50
     end
 
     function progression.getDeathlinkTrigger()

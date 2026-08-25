@@ -3,6 +3,7 @@ local gameState = require("necro.client.GameState")
 local gfx = require "system.gfx.GFX"
 local itemPickup = require "necro.game.item.ItemPickup"
 
+local apGrants = require("AP.scripts.items.apGrants")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 local apItemShowcase = require("AP.scripts.entities.apItemShowcase")
 local apLobby = require("AP.scripts.level.apLobby")
@@ -66,6 +67,32 @@ event.objectTryCollectItem.add("pickupAPModeShrine", { order = "priceTag", seque
 
     if (ev.item.name == "AP_ModeShrine") then
         if ev.result ~= itemPickup.Result.SUCCESS then return end
-        progression.enableExtraMode(string.gsub(ev.item.AP_hintLabel.text, " Mode", ""))
+
+        local mode = string.match(ev.item.AP_hintLabel.text or "", "^(.*) Mode$")
+        if mode then
+            progression.enableExtraMode(mode)
+        end
     end
 end)
+
+-- No carrier: AP_ModeShrine stands in for all eight modes and for the shrine items too,
+-- so which one it is lives in its label rather than its type. The lobby handler above
+-- reads that; this is the fallback for a grant.
+local GRANTED_MODES = {
+    APNoReturnMode    = "No Return",
+    APHardMode        = "Hard",
+    APPhasingMode     = "Phasing",
+    APRandomizerMode  = "Randomizer",
+    APMysteryMode     = "Mystery",
+    APNoBeatMode      = "No Beat",
+    APDoubleTempoMode = "Double Tempo",
+    APLowPercentMode  = "Low Percent",
+}
+
+for itemId, mode in pairs(GRANTED_MODES) do
+    apGrants.define({
+        item = itemId,
+        sound = "shrineActivate",
+        apply = function() progression.enableExtraMode(mode) end,
+    })
+end

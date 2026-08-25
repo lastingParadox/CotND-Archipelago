@@ -90,16 +90,25 @@ function apGameModeSelect.generateExtraModesRoom(originX, lobbyY)
     local apLobbyX, apLobbyY = marker.lookUpFirst(marker.Type.AP_SPAWN)
     lobbyUtils.addDestination(centerX - 4, -1, apLobbyX, apLobbyY, "mod.AP.lobby.stairBack", "TriggerTravelPrimaryOnly")
 
-    lobbyUtils.addLabel(centerX + 4, -1, "mod.AP.lobby.stair.zones")
+    object.spawn("AP_ZonesStairLabel", centerX + 4, -1)
     object.spawn("AP_TriggerAPTrap", centerX + 4, -1)
 
-    -- Interferes with vanilla lobby LabelExtraModeInfos, need to find a way to not override them
-    object.spawn("LabelExtraModeInfo", centerX, -1, {
+    -- The top one carries the opening blurb, as the vanilla room does; the bottom one
+    -- stays hidden until a shrine nearer to it is touched.
+    object.spawn("AP_LabelExtraModeInfo", centerX, -1, {
         worldLabel = {
             alignY = 0
+        },
+        worldLabelFade = {
+            falloff = 0.0001,
+            maxDistance = 10000
         }
     })
-    object.spawn("LabelExtraModeInfo", centerX, maxY - 1)
+    object.spawn("AP_LabelExtraModeInfo", centerX, maxY - 1, {
+        worldLabelFade = {
+            maxDistance = 0
+        }
+    })
 end
 
 return apGameModeSelect

@@ -34,6 +34,14 @@ for _, character in ipairs(CHARACTERS) do
             spriteSheet = { frameX = 1, frameY = 1 },
             AP_buffItem = { character = character },
         },
+        -- No carrier. The lobby handler below covers the shrines, which stand on no AP
+        -- location and so have nowhere to record a pickup; unlocking is a flag either way.
+        grant = {
+            item = entity,
+            carrier = false,
+            sound = "shrineActivate",
+            apply = function() progression.unlockBuffItem(character) end,
+        },
     })
 
     apBuffItem.buffs[#apBuffItem.buffs + 1] = { character = character, entity = entity }

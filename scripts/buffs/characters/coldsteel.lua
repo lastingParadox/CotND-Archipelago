@@ -141,6 +141,10 @@ event.render.add("apMikuBuffComboBarPost", { order = "healthBars", sequence = 1 
     cachedLeek, cachedHolder = nil, nil
 end)
 
-function coldsteel.apply() end
+function coldsteel.apply(entity)
+    if not entity then return end
+    inventory.replace("FeetBalletShoes", entity)
+end
+
 function coldsteel.revoke() end
 return coldsteel

@@ -8,9 +8,6 @@ local turn         = require "necro.cycles.Turn"
 local makeSummonTrap = (require "AP.scripts.traps.factories.makeSummonTrap").makeSummonTrap
 local TrapHandler    = require "AP.scripts.traps.trapHandler"
 
----Each group is a self-contained makeSummonTrap config plus a `weight`
----controlling how often it is picked when no variant is requested.
----TrapLink can target a group directly via args.variant (e.g. "Beetle").
 local GROUPS = {
     Skeleton = {
         weight = 3,
@@ -36,7 +33,6 @@ local GROUPS = {
                 Skull2           = 1,
                 Skull3           = 1,
             },
-            -- Incremental zone multipliers applied on top of base weights.
             zoneWeights = {
                 [2] = {
                     Armoredskeleton  = 1.5,
@@ -82,6 +78,74 @@ local GROUPS = {
             variants    = { Beetle = 1, Beetle2 = 1 },
         },
     },
+    Goblin = {
+        weight = 3,
+        config = {
+            min         = 2,
+            max         = 6,
+            radius      = 4,
+            flyawayText = "Goblin Trap!",
+            variants    = {
+                Goblin         = 12,
+                Goblin2        = 9,
+                GoblinBomber   = 6,
+                SleepingGoblin = 3,
+            },
+            zoneWeights = {
+                [2] = { Goblin2 = 1.5, GoblinBomber = 1.1, },
+                [3] = { Goblin2 = 1.3, GoblinBomber = 1.1 },
+                [4] = { GoblinBomber = 1.5, SleepingGoblin = 1.2 },
+                [5] = { Goblin2 = 1.5, GoblinBomber = 1.5 },
+            },
+        },
+    },
+    Golem = {
+        weight = 3,
+        config = {
+            min         = 2,
+            max         = 6,
+            radius      = 4,
+            flyawayText = "Golem Trap!",
+            variants    = {
+                Golem  = 12,
+                Golem2 = 8,
+                Golem3 = 4,
+            },
+            zoneWeights = {
+                [2] = { Golem2 = 1.5 },
+                [3] = { Golem3 = 1.1 },
+                [4] = { Golem3 = 1.5 },
+                [5] = { Golem3 = 1.75 },
+            },
+        },
+    },
+    Slime = {
+        weight = 3,
+        config = {
+            min         = 2,
+            max         = 6,
+            radius      = 4,
+            flyawayText = "Slime Trap!",
+            -- Slime6 through Slime8 are Amplified-only; without it they simply fail to
+            -- spawn, the same way the Skeleton group's skulls do.
+            variants    = {
+                Slime  = 3,
+                Slime2 = 10,
+                Slime3 = 10,
+                Slime4 = 8,
+                Slime5 = 8,
+                Slime6 = 6,
+                Slime7 = 4,
+                Slime8 = 4,
+            },
+            zoneWeights = {
+                [2] = { Slime2 = 1.5, Slime3 = 1.5 },
+                [3] = { Slime4 = 1.5, Slime5 = 1.5 },
+                [4] = { Slime6 = 1.75 },
+                [5] = { Slime7 = 2, Slime8 = 2 },
+            },
+        },
+    },
     Person = {
         weight = 1,
         config = {
@@ -89,19 +153,15 @@ local GROUPS = {
             max           = 6,
             radius        = 4,
             flyawayText   = "Hello Everyone!",
-            spawnProps    = false, -- people don't need aggro/stairLocker/ambusher
-            particles     = false, -- no reroll particles on friendly spawns
+            spawnProps    = false,
+            particles     = false,
             checkGrabbed  = false,
             requireSpawns = true,
-            -- Pick from all playable character entity types each turn.
             getVariants   = function(_zone)
                 return ecs.getEntityTypesWithComponents({ "playableCharacter" })
             end,
-            -- Play each spawned character's greeting voice line.
             onSpawn       = function(spawned, _tile)
                 team.setTeam(spawned, team.Id.NONE)
-                -- Mark as spectating so these cosmetic spawns are excluded from the
-                -- exit-level requirement count and don't softlock the level transition.
                 spawned.spectator.active = true
                 if spawned.voiceGreeting and spawned.voiceGreeting.sound then
                     sound.play(spawned.voiceGreeting.sound, spawned.position.x, spawned.position.y)

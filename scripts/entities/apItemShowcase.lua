@@ -70,6 +70,7 @@ apItemShowcase.apShowcaseList = orderedTable({
     { key = "APGoldenLuteShard",       value = { label = "Golden Lute Shard", category = "upgrade", preview = "AP_GoldenLuteShard", showCount = true } },
     { key = "APShopStock",             value = { label = "Shop Restock", category = "upgrade", preview = "AP_ShopStock", showCount = true } },
     { key = "APProgressivePotions",    value = { label = "Progressive Potions", category = "upgrade", preview = "AP_ProgressivePotions", showCount = true } },
+    { key = "APProgressiveCoinMultiplier", value = { label = "Progressive Coin Multiplier", category = "upgrade", preview = "AP_ProgressiveCoinMultiplier", showCount = true } },
     { key = "APProgressiveZoneAccess", value = { label = "Progressive Zone Access", category = "upgrade", preview = "AP_ProgressiveZoneAccess", showCount = true } },
     { key = "APZone1Access",           value = { label = "Zone 1 Access", category = "upgrade", preview = "AP_Zone1Access" } },
     { key = "APZone2Access",           value = { label = "Zone 2 Access", category = "upgrade", preview = "AP_Zone2Access" } },

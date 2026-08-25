@@ -14,10 +14,10 @@ event.objectTakeDamage.add("apMonkBuffVow", {
     filter = "itemCollectorBannedPickupDamage",
     order = "increase",
 }, function(ev)
-    if not isMonkBuff() then return end
+    if not isMonkBuff() or ev.entity.name ~= "Monk" then return end
     if ev.type ~= damage.Type.SUICIDE then return end
     if not ev.entity.health then return end
-    ev.damage = math.floor(ev.entity.health.maxHealth / 2)
+    ev.damage = math.max(1, math.floor(ev.entity.health.maxHealth / 2))
 end)
 
 function monk.apply(entity) end

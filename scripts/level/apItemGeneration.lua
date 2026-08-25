@@ -1,21 +1,22 @@
-local bitAnd = bit.band
-local bitXor = bit.bxor
-local currency     = require "necro.game.item.Currency"
-local currentLevel = require "necro.game.level.CurrentLevel"
-local ecs          = require "system.game.Entities"
-local flyaway      = require "necro.game.system.Flyaway"
+local bitAnd         = bit.band
+local bitXor         = bit.bxor
+local currency       = require "necro.game.item.Currency"
+local currentLevel   = require "necro.game.level.CurrentLevel"
+local ecs            = require "system.game.Entities"
+local flyaway        = require "necro.game.system.Flyaway"
 local itemGeneration = require "necro.game.item.ItemGeneration"
-local itemPickup   = require "necro.game.item.ItemPickup"
-local object       = require "necro.game.object.Object"
-local randomPool   = require "system.utils.RandomPool"
-local rng          = require "necro.game.system.RNG"
-local stringHash   = require("system.utils.StringHash")
-local targeting    = require "necro.game.enemy.Targeting"
+local itemPickup     = require "necro.game.item.ItemPickup"
+local object         = require "necro.game.object.Object"
+local objectMap      = require "necro.game.object.Map"
+local randomPool     = require "system.utils.RandomPool"
+local rng            = require "necro.game.system.RNG"
+local stringHash     = require("system.utils.StringHash")
+local targeting      = require "necro.game.enemy.Targeting"
 
-local apUtils   = require("AP.scripts.utils.apUtils")
-local progression = require("AP.scripts.client.progression")
+local apUtils        = require("AP.scripts.utils.apUtils")
+local progression    = require("AP.scripts.client.progression")
 
-local itemPoolCache = {}
+local itemPoolCache  = {}
 
 event.shopkeeperTransaction.add("apSpawnItemFallback", {
     filter = "transactionSpawnItem",
@@ -98,18 +99,206 @@ event.itemGenerate.add("apSetLevelOverride", { order = "initParameters", sequenc
     end
 end)
 
+-- The blood shrine, the glass shop and the glass shrines all pin the material they hand out.
+local function pinsWeaponMaterial(requiredComponents)
+    for _, name in ipairs(requiredComponents or {}) do
+        if name:find("weaponMaterial", 1, true) then return true end
+    end
+
+    return false
+end
+
+-- The shape behind a material variant, read off weaponType rather than parsed from the name
+local function baseWeaponName(item)
+    if not item.weaponType or item.weaponType.name == "" then return nil end
+
+    local prefix = item.name:match("^(.-)Weapon")
+    if not prefix then return nil end
+
+    return prefix .. "Weapon" .. item.weaponType.name
+end
+
 event.itemGenerate.add("apBanUnownedItems", { order = "initParameters", sequence = 2 }, function(ev)
     if not apUtils.isAPContext() then return end
+    if ev.AP_ignoreOwnership then return end
+
+    -- A request that pins a material is granting that material
+    local materialGranted = pinsWeaponMaterial(ev.requiredComponents)
 
     local originalFilter = ev.filter
     ev.filter = function(item, args, player)
         local itemName = item.name
+        local owned = progression.getItems(itemName)
 
-        if progression.getItems(itemName) and not progression.getBannedItems(itemName) then
+        if not owned and materialGranted then
+            local base = baseWeaponName(item)
+            owned = base ~= nil and progression.getItems(base)
+        end
+
+        if owned and not progression.getBannedItems(itemName) then
             return originalFilter(item, args, player)
         end
 
         return false
+    end
+end)
+
+-- Unlocked and not sitting in the janitor's ban list.
+local function isAvailableItem(itemName)
+    return progression.getItems(itemName) and not progression.getBannedItems(itemName)
+end
+
+-- Swaps a placed item for a generated one, keeping the tile and the offer it belongs to.
+local function replacePlacedItem(item, genArgs)
+    local replacement = itemGeneration.choice(genArgs)
+    if not replacement or replacement == "" then return false end
+
+    local choice = item.item.singleChoice
+    local spawned = object.spawn(itemGeneration.maybeMarkSeen(replacement),
+        item.position.x, item.position.y)
+
+    if not spawned then return false end
+    if spawned.item then spawned.item.singleChoice = choice end
+
+    object.delete(item)
+
+    return true
+end
+
+-- A shrine writes its fixed offers straight into itself, so they never reach the generation
+-- filter. Everything it laid out is tagged with its own ID.
+local function replaceUnavailableOffers(ev, genArgs)
+    local offers = {}
+
+    for item in ecs.entitiesWithComponents({ "item", "position" }) do
+        if item.item.singleChoice == ev.entity.id and not isAvailableItem(item.name) then
+            offers[#offers + 1] = item
+        end
+    end
+
+    for _, item in ipairs(offers) do
+        replacePlacedItem(item, genArgs)
+    end
+end
+
+-- Three fixed shovels, none of which pass through generation.
+event.shrine.override("space", function(func, ev)
+    func(ev)
+
+    if not apUtils.isAPContext() then return end
+
+    replaceUnavailableOffers(ev, { chanceType = "chest", slot = "shovel", player = ev.interactor })
+end)
+
+-- Drops a fixed Blood Shovel beside the weapon it generates.
+event.shrine.override("blood", function(func, ev)
+    func(ev)
+
+    if not apUtils.isAPContext() then return end
+
+    local shovel = objectMap.firstWithComponent(ev.x, ev.y + 1, "item")
+
+    if shovel and not isAvailableItem(shovel.name) then
+        replacePlacedItem(shovel, { chanceType = "chest", slot = "shovel", player = ev.interactor })
+    end
+end)
+
+-- initializeParameters assigns ev.filter outright, so a caller cannot pass one in; this
+-- reads a name set off the request instead. Sequence 4: after the ownership filter.
+event.itemGenerate.add("apExcludeNamedItems", { order = "initParameters", sequence = 4 }, function(ev)
+    local excluded = ev.AP_excludeNames
+    if not excluded then return end
+
+    local originalFilter = ev.filter
+    ev.filter = function(item, args, player)
+        if excluded[item.name] then return false end
+        return originalFilter(item, args, player)
+    end
+end)
+
+-- Every piece of glass gear the shop can stand in for. A superset of its own four, so an
+-- unlocked Glass Jaw can fill a slot the shop would never have offered it for.
+local GLASS_STOCK = {
+    "ArmorGlass",
+    "ArmorHeavyglass",
+    "HeadGlassJaw",
+    "FeetGlassSlippers",
+    "TorchGlass",
+    "ShovelGlass",
+}
+
+-- Not an AP item, so it is never gated and always closes the chain.
+local GLASS_FALLBACK = "ShovelShard"
+
+local function generatedGlassWeapon(ev, excluded)
+    local weapon = itemGeneration.choice({
+        chanceType = "secret",
+        requiredComponents = { ev.entity.generateShopGlass.component },
+        AP_excludeNames = excluded,
+    })
+
+    return weapon ~= "" and weapon or nil
+end
+
+local function unlockedGlassGear(offered)
+    local pool = {}
+
+    for _, itemName in ipairs(GLASS_STOCK) do
+        if isAvailableItem(itemName) and not (offered and offered[itemName]) then
+            pool[#pool + 1] = itemName
+        end
+    end
+
+    return pool
+end
+
+local function draw(pool, channel)
+    if #pool == 0 then return nil end
+
+    return pool[rng.int(#pool, channel) + 1]
+end
+
+-- Only once both fresh pools are dry: gear and one weapon roll share the draw, so the
+-- repeat can be either.
+local function drawGlassDuplicate(ev, channel)
+    local pool = unlockedGlassGear(nil)
+    local weapon = generatedGlassWeapon(ev, nil)
+
+    if weapon then pool[#pool + 1] = weapon end
+
+    return draw(pool, channel)
+end
+
+-- The glass shop takes two of its items straight off its own list, so those never reach the
+-- filter above and can be things the player has not unlocked.
+event.generateShopItems.add("apGlassShopUnlocks", {
+    filter = "generateShopGlass",
+    order = "all",
+    sequence = 1,
+}, function(ev)
+    if not apUtils.isAPContext() then return end
+
+    local offered = {}
+    for _, itemName in ipairs(ev.items) do offered[itemName] = true end
+
+    local channel = rng.makeChannel(
+        ev.seed or 0,
+        (ev.depth or 0) * 4344 + (ev.floor or 0) * 4340 + (ev.zone or 0),
+        58121 -- unique salt for glass shop restocking
+    )
+
+    for index, itemName in ipairs(ev.items) do
+        if not isAvailableItem(itemName) then
+            -- Anything the shop is not already showing first, gear before weapon; only then
+            -- a repeat, and failing that the shard nobody can lock.
+            local replacement = draw(unlockedGlassGear(offered), channel)
+                or generatedGlassWeapon(ev, offered)
+                or drawGlassDuplicate(ev, channel)
+                or GLASS_FALLBACK
+
+            offered[replacement] = true
+            ev.items[index] = itemGeneration.maybeMarkSeen(replacement)
+        end
     end
 end)
 
@@ -172,39 +361,11 @@ local function generateWeightedItemPool(requiredComponents, weightComponent, tie
     return randomPool.new(seed, itemTypes, itemWeights)
 end
 
-local function generateUnweightedItemPool(requiredComponents, weightComponent, seed)
+local function generateUnweightedItemPool(requiredComponents, seed)
     local itemTypes = {}
-    local seen = {}
 
     for _, entity in ecs.prototypesWithComponents(requiredComponents) do
-        if not seen[entity.name] then
-            seen[entity.name] = true
-            itemTypes[#itemTypes + 1] = entity
-        end
-    end
-
-    local hasWeightComponent = false
-    for _, c in ipairs(requiredComponents) do
-        if c == weightComponent then
-            hasWeightComponent = true
-            break
-        end
-    end
-
-    if hasWeightComponent then
-        local apComponents = {}
-        local apWeightComponent = "AP_" .. weightComponent
-
-        for i, c in ipairs(requiredComponents) do
-            apComponents[i] = (c == weightComponent) and apWeightComponent or c
-        end
-
-        for _, entity in ecs.prototypesWithComponents(apComponents) do
-            if not seen[entity.name] then
-                seen[entity.name] = true
-                itemTypes[#itemTypes + 1] = entity
-            end
-        end
+        itemTypes[#itemTypes + 1] = entity
     end
 
     return randomPool.new(seed, itemTypes)
@@ -232,6 +393,46 @@ event.itemGenerate.override("initializeRandomPool", function(func, ev)
     end
 end)
 
+local function ownedVaultItem(key)
+    local best
+
+    for _, proto in ecs.prototypesWithComponents({ "itemPoolVault" }) do
+        if proto.itemPoolVault.key == key and isAvailableItem(proto.name)
+            and (not best or proto.itemPoolVault.priority < best.itemPoolVault.priority) then
+            best = proto
+        end
+    end
+
+    return best and best.name
+end
+
+event.levelLoad.add("apReplaceUnownedPlacedItems", { order = "initialItems", sequence = 1 }, function()
+    if not apUtils.isAPContext() then return end
+
+    local stale = {}
+
+    for entity in ecs.entitiesWithComponents({ "itemPoolVault", "item", "position" }) do
+        if entity.item.holder == 0 and not isAvailableItem(entity.name) then
+            stale[#stale + 1] = entity
+        end
+    end
+
+    for _, entity in ipairs(stale) do
+        local x, y = entity.position.x, entity.position.y
+        local replacement = ownedVaultItem(entity.itemPoolVault.key)
+            or itemGeneration.choice({
+                chanceType = "chest",
+                player = itemGeneration.randomPlayer(currentLevel.getNumber()),
+            })
+
+        object.delete(entity)
+
+        if replacement then
+            object.spawn(replacement, x, y)
+        end
+    end
+end)
+
 event.gameStateLevel.add("apInvalidateItemPoolCaches", { order = "itemPools" }, function()
     itemPoolCache = {}
 end)
@@ -243,7 +444,6 @@ event.ecsSchemaReloaded.add("apClearItemPoolCaches", { order = "clearCache" }, f
 end)
 
 -- In AP context, filter the uncertainty shrine to only weapons whose base form is unlocked.
--- If no candidates: give 50g fallback (skipped for goldHater/Monk) and show a flyaway.
 event.shrine.override("uncertainty", function(func, ev)
     if not apUtils.isAPContext() then
         return func(ev)
@@ -252,10 +452,13 @@ event.shrine.override("uncertainty", function(func, ev)
     local candidates = {}
     -- "weapon", not "weaponCommon": the latter is not a component.
     for _, entity in ecs.prototypesWithComponents({ "itemPoolUncertainty", "weapon" }) do
-        local name = entity.name
-        local baseName = name:sub(1, -10)  -- strip "Uncertain" (9 chars)
-        if progression.getItems(baseName) and not progression.getBannedItems(baseName) then
-            candidates[#candidates + 1] = name
+        local shape = baseWeaponName(entity)
+        local revealed = entity.variant and entity.variant.base
+
+        if shape and revealed and progression.getItems(shape)
+            and not progression.getBannedItems(revealed)
+        then
+            candidates[#candidates + 1] = entity.name
         end
     end
 
@@ -272,7 +475,7 @@ event.shrine.override("uncertainty", function(func, ev)
         return
     end
 
-    local chosen = candidates[rng.int(#candidates, ev.interactor)]
+    local chosen = rng.choice(candidates, ev.interactor)
     local item   = object.spawn(chosen, ev.interactor.position.x, ev.interactor.position.y)
     itemPickup.tryCollect(item, ev.interactor, true)
 end)

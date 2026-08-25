@@ -8,6 +8,7 @@ local sound = require "necro.audio.Sound"
 local ui = require "necro.render.UI"
 local visualExtent = require "necro.render.level.VisualExtent"
 
+local apEventSync = require("AP.scripts.client.apEventSync")
 local apFlags = require("AP.scripts.utils.flags")
 local apFlyaways = require("AP.scripts.ui.apFlyaways")
 local apLog = require("AP.scripts.utils.log").apLog
@@ -75,12 +76,19 @@ local function applyDeathlink(message)
     end
 end
 
+apEventSync.subscribe("deathlink", function(data)
+    applyDeathlink(data.message)
+end)
+
+-- Only the host is handed the packet, so it publishes rather than applying: the
+-- flyaways, countdown and damage all have to happen on every client's own
+-- simulation or they exist on one screen only.
 handlers.register("Death", function(message, ctx)
     if not apStorage.saveData.deathlink or currentLevel.isSafe() then return end
 
     local deathlinkMessage = message.source or message.msg or "DeathLink"
     apLog("Deathlink received from " .. deathlinkMessage)
-    applyDeathlink(deathlinkMessage)
+    apEventSync.publish("deathlink", { message = deathlinkMessage })
 end)
 
 event.render.add("apRenderMarvDeathLinkTags", { order = "playerNames" }, function(ev)

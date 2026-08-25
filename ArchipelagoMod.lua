@@ -24,7 +24,6 @@ components.register({
     AP_exchanger = {},
     AP_traplinkShrine = {},
     AP_victoryItem = {},
-    AP_victorySlot = {},
     AP_flyaway = {
         components.field.string("text", "AP Item Obtained"),
     },
@@ -44,9 +43,6 @@ components.register({
     AP_character = {
         components.field.string("name", ""),
     },
-    AP_hintItem = {
-        components.field.string("type", ""),
-    },
     AP_hintTrap = {},
     AP_interactable = {
         components.field.bool("ap", false),
@@ -60,9 +56,6 @@ components.register({
         components.field.bool("resetPosition", false),
     },
     AP_item = {},
-    AP_itemClass = {
-        components.field.int("classification", 0), -- 0 = filler, 1 = progression, 2 = useful, 4 = trap
-    },
     AP_hintLabel = {
         components.field.string("text", ""),
         components.field.float("offsetX", 0),
@@ -141,7 +134,8 @@ components.register({
     },
     AP_progressionDoor = {
         components.field.table("npc", { "Merlin" }),
-        components.field.string("orientation", "Horizontal")
+        components.field.string("orientation", "Horizontal"),
+        components.field.string("label", "")
     },
     AP_npcUnlockable = {
         components.field.int("keyType", 0),
@@ -152,13 +146,11 @@ components.register({
         components.field.bool("caged", false),
         components.field.bool("freed", false)
     },
-    AP_player = {
-        components.field.string("name", ""),
-    },
     AP_shrinePoolWeight = {
         components.constant.float("weight", 0),
     },
     AP_editorCategory = {},
+    AP_extraModeLabel = {},
     AP_preview = {
         components.field.float("offsetX", 0),
         components.field.float("offsetY", 0),
@@ -167,19 +159,25 @@ components.register({
         components.field.int("outlineColor", color.TRANSPARENT),
         components.field.bool("shadowCopyZ", false),
     },
-    AP_shopItem = {
-        components.field.entityID("slot")
-    },
     AP_locationItem = {
         components.field.string("locationName", ""),
         components.field.string("locationCode", ""),
+        components.field.entityID("slot"),
+        components.field.string("player", ""),
+        components.field.int("classification", 0), -- 0 = filler, 1 = progression, 2 = useful, 4 = trap
     },
-    AP_chestKind = {
-        components.constant.string("kind", ""),
+    AP_container = {
+        components.constant.string("source", ""),
+    },
+    AP_noReplace = {},
+    AP_bossRushChest = {
+        components.field.bool("loadout", false),
+    },
+    AP_bossRushShopSlot = {
+        components.field.bool("potion", false),
     },
     AP_chestUpgrade = {
         components.constant.string("chest", ""),
-        components.constant.string("chanceType", ""),
         components.constant.int("order", 0),
     },
     AP_npc = {
@@ -197,8 +195,14 @@ components.register({
         components.field.entityID("item")
     },
     AP_shopStock = {},
+    AP_zonesStairLabel = {
+        components.field.entityID("label")
+    },
     AP_spellResonanceMode = {
         components.constant.string("type", "kills")
+    },
+    AP_randomItem = {
+        components.field.string("itemType", ""),
     },
     AP_trapItem = {
         components.field.string("trap", ""),
@@ -216,10 +220,6 @@ components.register({
     },
     AP_worldLabelCharacterStats = {
         components.field.string("characterType", "")
-    },
-    AP_zweihaenderTransform = {
-        components.constant.bool("isWielder", false),
-        components.constant.string("targetType", "Cadence")
     },
     AP_diamondCounter = {
         components.field.int("amount"),
@@ -239,7 +239,6 @@ components.register({
     AP_buffPotionDecrease = {},
     AP_buffPotionIncrease = {},
     AP_buffPotionDisplay = {},
-    AP_buffPotionTitle = {},
 })
 
 
@@ -251,6 +250,11 @@ textPool.register("Archipelago Item Pool", "mod.AP.lobby.itemHub")
 textPool.register("Here you can find all items you've\nreceived in your AP World", "mod.AP.lobby.itemHubHint")
 textPool.register("Archipelago", "mod.AP.lobby.itemHub.apSection")
 textPool.register("Back to\nItem Hub", "mod.AP.lobby.stairBackHub")
+
+textPool.register("Hintmaster", "mod.AP.lobby.npc.hintmaster")
+textPool.register("Codex", "mod.AP.lobby.npc.codex")
+textPool.register("Buffmaster", "mod.AP.lobby.npc.buffmaster")
+textPool.register("Settings", "mod.AP.lobby.npc.settingsmaster")
 
 textPool.register("Characters", "mod.AP.lobby.itemCat.character")
 textPool.register("Weapons", "mod.AP.lobby.itemCat.weapon")
@@ -285,10 +289,11 @@ textPool.register("Remove items from the\n AP item pool?", "mod.AP.lobby.janitor
 textPool.register("Take these on your\n next AP run!", "mod.AP.lobby.dealerHint")
 textPool.register("Get hints from random runs!", "mod.AP.lobby.hintmasterHint")
 textPool.register("Settings", "mod.AP.lobby.settingsmasterHint")
-textPool.register("Ensemble\n", "mod.AP.lobby.stair.ensemble")
-textPool.register("Boss Rush\n", "mod.AP.lobby.stair.bossRush")
+textPool.register("Ensemble", "mod.AP.lobby.stair.ensemble")
+textPool.register("Boss Rush", "mod.AP.lobby.stair.bossRush")
 textPool.register("Archipelago Mode!\nDefeat all bosses in Boss Rush\nto complete your game!", "mod.AP.lobby.bossRushHint")
 textPool.register("Configure permanent\nrun buffs!", "mod.AP.lobby.buffmasterHint")
 textPool.register("Buff Room", "mod.AP.lobby.buffRoom")
 textPool.register("These buffs apply\nto all AP runs!", "mod.AP.lobby.buffRoomHint")
 textPool.register("Archipelago Mode!\nBuy the Victory Item\nto complete your game!", "mod.AP.lobby.expensivePurchaseHint")
+textPool.register("Halfway Shop", "mod.AP.level.bossRushShop.label")

@@ -45,7 +45,7 @@ end
 local function bananaPeelTrap(ev)
 	local trapSuccess = false
 
-	for _, entry in ipairs(ev.actionQueue or {}) do
+	for _, entry in ipairs(TrapHandler.actingEntries(ev)) do
 		local entity = entry.entity
 		if not entity or not entity.playableCharacter then
 			goto continue

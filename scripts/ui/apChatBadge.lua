@@ -1,6 +1,7 @@
 local chatBadge = require "necro.client.ChatBadge"
 local chat      = require "necro.client.Chat"
-local color     = require "system.utils.Color"
+
+local apColors  = require("AP.scripts.utils.apColors")
 
 local AP_BADGE = chatBadge.Type.extend("ARCHIPELAGO", {
     data = {
@@ -10,7 +11,7 @@ local AP_BADGE = chatBadge.Type.extend("ARCHIPELAGO", {
             "mods/AP/gfx/icons/badge-ap-48.png",
             "mods/AP/gfx/icons/badge-ap-64.png",
         },
-        color = color.rgb(49, 107, 132),
+        color = apColors.chatBadge,
     }
 })
 

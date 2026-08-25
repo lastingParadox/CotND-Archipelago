@@ -41,11 +41,7 @@ local progression = require("AP.scripts.client.progression")
 
 local isLobby = currentLevel.isLobby
 
--- Rift skins have different frame dimensions than the prototype sprite; outlineFilter
--- reads prototype width/height, producing a misaligned outline. We draw the correct
--- outline manually and null ev.outline to skip the default handler. However, ev is
--- shared with the head attachment's nested preview, so stash and restore at sequence 1
--- instead of leaving it nil permanently.
+-- Rift skins have different frame dimensions than the prototype sprite
 event.objectPreview.add("apFixRiftSkinOutline", {
     filter = {"CharacterSkins_skinnable", "sprite"},
     order = "outline",
@@ -132,8 +128,7 @@ local function isCharacterLocked(name)
     if not apClient.isSessionConnected() then return true end
     if not progression.getCharacters(character) then return true end
 
-    local characterUnlocks = progression.getCharacterUnlocks()
-    if characterUnlocks == 1 or characterUnlocks == 2 then
+    if progression.requiresCharacterItems() then
         return getMissingRequiredItems(name) ~= nil
     end
 
@@ -201,31 +196,32 @@ local function isCharacterComplete(charData, character)
     return true
 end
 
-local function getZoneStatusLine(charData, character)
+-- Story bosses get their own line: with Amplified, Cadence and Nocturna would otherwise
+-- read 1/2/3/4/5/DR/ND on one line and overrun the label.
+local function getZoneStatusLines(charData, character)
     local lastZone = progression.isDLCEnabled("Amplified") and 5 or 4
     local goal = progression.getGoal()
     local GREEN = theme.Color.STATUS_OK
     local RED = color.rgb(255, 80, 80)
 
-    local parts = {}
+    local zones = {}
     for zone = 1, lastZone do
         local completed = charData["Zone " .. zone] == true
-        table.insert(parts, textFormat.color(tostring(zone), completed and GREEN or RED))
-    end
-
-    -- Story bosses are checks of their own, so they read as extra segments after
-    -- the zones: Cadence is 1/2/3/4/DR/ND.
-    for _, boss in ipairs(progression.getStoryBosses(character)) do
-        local beaten = charData[boss.name] == true
-        table.insert(parts, textFormat.color(boss.abbreviation, beaten and GREEN or RED))
+        table.insert(zones, textFormat.color(tostring(zone), completed and GREEN or RED))
     end
 
     if goal == "All Zones" then
         local allDone = charData["All Zones"] == true
-        table.insert(parts, textFormat.color("A", allDone and GREEN or RED))
+        table.insert(zones, textFormat.color("A", allDone and GREEN or RED))
     end
 
-    return table.concat(parts, "/")
+    local bosses = {}
+    for _, boss in ipairs(progression.getStoryBosses(character)) do
+        local beaten = charData[boss.name] == true
+        table.insert(bosses, textFormat.color(boss.abbreviation, beaten and GREEN or RED))
+    end
+
+    return table.concat(zones, "/"), table.concat(bosses, "/")
 end
 
 event.objectUpdateTextLabel.add("apPersonalStats", {
@@ -248,8 +244,9 @@ event.objectUpdateTextLabel.add("apPersonalStats", {
         return
     end
 
-    local line = getZoneStatusLine(charData, character)
-    if line ~= "" then append(line) end
+    local zoneLine, bossLine = getZoneStatusLines(charData, character)
+    if zoneLine ~= "" then append(zoneLine) end
+    if bossLine ~= "" then append(bossLine) end
 end)
 
 local function getRandomPlayableCharacter(channel, exclude)

@@ -52,7 +52,7 @@ local BUFF_DESCRIPTIONS = {
     Klarinetta        = "Upgradeable Zweihander",
     Chaunter          = "Longer possessions",
     Suzu              = "Braver lance dashes",
-    ["Hatsune Miku"]  = "Reduced combo to SING",
+    ["Hatsune Miku"]  = "Reduced combo to SING, on pointe",
     ["Shovel Knight"] = "More digging, richer loot",
 }
 

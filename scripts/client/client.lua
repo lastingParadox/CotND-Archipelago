@@ -12,8 +12,6 @@ local singlePlayer = require "necro.client.SinglePlayer"
 -- Only the host holds the socket to the Archipelago client, so it mirrors the
 -- session state here for everyone else. A resource rather than a player
 -- attribute because level transitions block on resources.allTransfersDone(),
--- so every client agrees on this at a transition -- attributes arrive whenever
--- they arrive, which desyncs anything deterministic that reads them.
 local AP_STATE = netplay.Resource.extend("APState")
 
 local apChatBadge = require("AP.scripts.ui.apChatBadge")
@@ -86,9 +84,6 @@ end
 
 local apFolder = hasStorage and storage.new("archipelago") or { readFile = function(_) end }
 apClient, apFolder = script.persist(function() return apClient, apFolder end)
-
--- persist hands back the table from the previous load, so anything derived fresh
--- each load has to be reapplied to it or it stays at the older load's value.
 apClient.STATE_RESOURCE = AP_STATE
 
 function apClient.isPortSet()
@@ -100,9 +95,6 @@ function apClient.isHost()
     if not gameClient.isConnected() then
         return true
     end
-    -- In a session, fail closed: playerList.isHost() compares hostPlayerID with
-    -- localPlayerID, and both are nil until login completes, which would report
-    -- every client as the host.
     local hostID = playerList.getHostPlayerID()
     local localID = playerList.getLocalPlayerID()
     return hostID ~= nil and localID ~= nil and hostID == localID
