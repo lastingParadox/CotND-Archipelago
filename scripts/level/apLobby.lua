@@ -37,17 +37,16 @@ end
 
 function APLobby.sendToAPLobby(entities)
     if apClient.isSessionConnected() and gameState.isInLobby() then
+        -- Required here so this file does not pull the mode entities forward in load order.
+        require("AP.scripts.entities.apExtraModeConfiguration").disableLockedModes()
+
         for _, entity in ipairs(entities or player.getPlayerEntities()) do
             local playerID = entity.controllable.playerID
             local playerEntity = entity
             local character = apCharacters.cotNDCharToAPLocation(playerEntity.name)
 
-            local characters = progression.getCharacters()
-            local startingCharacter = progression.getStartingCharacter()
-            local characterRoomLocked = not progression.hasCharacterRoomKey()
-
             local function switchTo(characterName)
-                if not characterName or not characters[characterName] then
+                if not characterName or not progression.isCharacterPlayable(characterName) then
                     return false
                 end
 
@@ -57,15 +56,8 @@ function APLobby.sendToAPLobby(entities)
                 return true
             end
 
-            if characterRoomLocked and startingCharacter and character ~= startingCharacter then
-                switchTo(startingCharacter)
-                character = apCharacters.cotNDCharToAPLocation(playerEntity.name)
-            end
-
-            if not characters[character] then
-                if not (characterRoomLocked and switchTo(startingCharacter)) then
-                    switchTo(next(characters))
-                end
+            if not progression.isCharacterPlayable(character) then
+                switchTo(progression.getStartingCharacter())
             end
 
             currency.set(playerEntity, apFlags.CURRENCY_AP_DIAMOND, progression.getDiamonds() or 0)
@@ -86,16 +78,13 @@ function APLobby.sendToAPLobby(entities)
     end
 end
 
--- Online, the button moves only the players belonging to the client that pressed
--- it. Local coop shares one client, so there it still moves everyone.
+-- Moves only the pressing client's own players, which in local coop is everyone.
 function APLobby.sendLocalPlayersToAPLobby()
     if singlePlayer.isActive() then
         return APLobby.sendToAPLobby()
     end
 
-    -- Teleporting straight from the menu would mutate this client's simulation
-    -- alone; queueing a system action instead lets every client run it on the
-    -- same turn, the way the lobby spawns characters.
+    -- Queues a system action so every client runs the teleport on the same turn.
     for _, playerID in ipairs(localCoop.getLocalPlayerIDs()) do
         clientActionBuffer.addAction(playerID, clientActionBuffer.findAvailableTurnID(playerID), AP_LOBBY_ACTION, 0)
     end

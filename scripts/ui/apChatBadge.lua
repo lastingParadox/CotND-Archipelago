@@ -21,9 +21,7 @@ event.chatMessage.override("displayChatMessage", 0, function(orig, ev)
     orig(ev)
     if not ev.AP_SENTINEL then return end
 
-    -- A message emitted during a turn carries a turnID, and Chat replaces the
-    -- matching entry in place rather than pushing it onto the front, so the new
-    -- message is not necessarily history[1].
+    -- A turn message replaces its matching entry in place, so it is not always history[1].
     local history = chat.getMessageHistory()
     for i = 1, math.min(#history, 16) do
         local message = history[i]

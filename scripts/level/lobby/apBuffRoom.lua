@@ -50,7 +50,6 @@ function apBuffRoom.generateBuffRoom(sourceX, sourceY)
         worldLabelTextPool = { key = "mod.AP.lobby.buffRoomHint" },
     })
 
-    -- ── Health buff section ─────────────────────────────────────────────────
     -- Static "Bonus HP" header.
     object.spawn("LabelLobby", minX + 3, minY + 5, {
         worldLabel = { text = "Bonus HP", offsetY = -8 }
@@ -82,8 +81,7 @@ function apBuffRoom.generateBuffRoom(sourceX, sourceY)
     }))
     table.sort(protos, sortCharacters)
 
-    -- Centre the grid horizontally: 5 shrines at spacing 2 → spans 9 cols.
-    -- shrineStartX = centerX - floor(5/2)*2 = centerX - 4
+    -- Centres the grid horizontally: 5 shrines at spacing 2 span 9 columns.
     local shrineStartX = centerX - math.floor(SHRINE_COLS / 2) * 2
     local shrineStartY = minY + 8
 
@@ -95,8 +93,7 @@ function apBuffRoom.generateBuffRoom(sourceX, sourceY)
 
         local charName = apCharacters.cotNDCharToAPLocation(proto.name)
 
-        -- Left inactive: apBuffShrines drives the whole visual state from
-        -- progression, which the room may be built before receiving.
+        -- Left inactive, since apBuffShrines drives the visual state from progression.
         object.spawn("AP_BuffCharacterShrine", sx, sy, {
             AP_character = { name = charName },
         })

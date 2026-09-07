@@ -1,28 +1,22 @@
-local menu   = require "necro.menu.Menu"
-local player = require "necro.game.character.Player"
+local menu = require "necro.menu.Menu"
 
-local apFlyaways = require "AP.scripts.ui.apFlyaways"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
----Creates a sequential-dialog-chain trap and returns its trigger function.
----
----On trigger the trap shows a flyaway to the first local player, then opens a
----series of popup dialogs that must each be dismissed before the next appears.
----The trap returns false (stays queued) while a chain is already open.
----
+---Defines a trap that opens a chain of popup dialogs, each dismissed before the next.
 ---@param opts table
 ---  Required:
+---    name        string   Trap id.
 ---    menuName    string   Registry key for event.menu.add (must be unique per trap).
----    flyawayText string   Shown to the first player on trigger.
+---    flyaway     string   Shown to the first player on trigger.
 ---    title       string   Popup window title for every dialog in the chain.
 ---    messages    table    Ordered array of message strings (one popup per entry).
 ---  Optional:
----    buttonLabel string | function(index, total) -> string
----                         Label for the dismiss button. When a function, receives the
----                         1-based dialog index and total count. Default: "Got it!"
----@return function trapFn
+---    buttonLabel string | function(index, total) -> string   Dismiss label, default "Got it!".
+---@return table spec
 local function makeMenuTrap(opts)
+    assert(opts.name,        "makeMenuTrap: opts.name is required")
     assert(opts.menuName,    "makeMenuTrap: opts.menuName is required")
-    assert(opts.flyawayText, "makeMenuTrap: opts.flyawayText is required")
+    assert(opts.flyaway,     "makeMenuTrap: opts.flyaway is required")
     assert(opts.title,       "makeMenuTrap: opts.title is required")
     assert(opts.messages and #opts.messages > 0,
         "makeMenuTrap: opts.messages must be a non-empty table")
@@ -30,12 +24,9 @@ local function makeMenuTrap(opts)
     local buttonLabel = opts.buttonLabel or "Got it!"
     local total       = #opts.messages
 
-    local chainActive = false
-    chainActive = script.persist(function() return chainActive end)
-
     local function openDialog(remaining)
         if remaining <= 0 then
-            chainActive = false
+            trapSystem.stop(opts.name)
             return
         end
 
@@ -84,37 +75,14 @@ local function makeMenuTrap(opts)
         }
     end)
 
-    -- Clear the active flag on level transition (menu force-closed by the game).
-    event.gameStateLevel.add("AP" .. opts.menuName .. "Clear",
-        { order = "splitScreen" },
-        function()
-            chainActive = false
-        end
-    )
-
-    return function(ev)
-        if chainActive then return false end
-
-        local trapSuccess = false
-        local notified    = false
-
-        for _, entity in ipairs(player.getPlayerEntities()) do
-            if entity and entity.playableCharacter then
-                if not notified then
-                    apFlyaways.addToFlyawayQueue({ entity = entity, text = opts.flyawayText })
-                    notified = true
-                end
-                trapSuccess = true
-            end
-        end
-
-        if trapSuccess then
-            chainActive = true
-            openDialog(total)
-        end
-
-        return trapSuccess
-    end
+    return trapSystem.define({
+        name     = opts.name,
+        flyaway  = opts.flyaway,
+        announce = trapSystem.Announce.FIRST,
+        storage  = trapSystem.Storage.VOLATILE,
+        stateful = true,
+        finish   = function() openDialog(total) end,
+    })
 end
 
 return { makeMenuTrap = makeMenuTrap }

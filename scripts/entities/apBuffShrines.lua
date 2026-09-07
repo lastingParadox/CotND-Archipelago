@@ -21,8 +21,7 @@ local function isCharacterLocked(apName)
     if not apClient.isSessionConnected() then return true end
     if not progression.getCharacters(apName) then return true end
 
-    -- Slots that do not randomise buffs are granted all of them up front, so
-    -- possession is the only question either way.
+    -- Slots that do not randomise buffs are granted all of them up front.
     return not progression.hasBuffItem(apName)
 end
 
@@ -173,10 +172,7 @@ local function spawnBuffOrbitParticles(entity)
     })
 end
 
--- Only the interact handler used to set the sprite frame, light and particles,
--- so a buff already enabled in the save left its shrine looking untouched. The
--- shrine follows progression instead, which also covers the buff arriving after
--- the room was built -- on connect, on a state sync, or mid-session.
+-- The shrine's frame, light and particles follow progression rather than the interact handler.
 local function refreshBuffShrine(entity)
     local character = entity.AP_character and entity.AP_character.name
     if not character or character == "" then return end

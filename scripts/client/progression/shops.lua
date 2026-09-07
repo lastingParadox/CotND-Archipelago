@@ -33,8 +33,7 @@ local function attach(progression)
         return locations
     end
 
-    -- "stocked" (an item is on display), "gated" (a slot remains but needs more
-    -- Shop Restock), or "empty" (every slot bought out; restock won't help).
+    -- "stocked", "gated" (needs more Shop Restock), or "empty" (every slot bought out).
     function progression.getShopState(npc)
         local sections = progression.getShopLocations(npc)
         if not sections then return "stocked" end

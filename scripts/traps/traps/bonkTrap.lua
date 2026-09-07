@@ -2,14 +2,13 @@ local confusion = require "necro.game.character.Confusion"
 local sound     = require "necro.audio.Sound"
 
 local makeMirrorXTrap = (require "AP.scripts.traps.factories.makeMirrorXTrap").makeMirrorXTrap
-local TrapHandler     = require "AP.scripts.traps.trapHandler"
 
 local BONK_SOUND      = "mods/AP/sfx/bonk.ogg"
 local CONFUSION_TURNS = 24
 
-TrapHandler.register("BonkTrap", makeMirrorXTrap({
+makeMirrorXTrap({
     name         = "BonkTrap",
-    flyawayText  = "Bonk!",
+    flyaway      = "Bonk!",
     mirrorXScale = 2.5,  -- wider X
     scaleY       = 0.5,  -- squashed Y
     guard = function(entity)
@@ -22,4 +21,4 @@ TrapHandler.register("BonkTrap", makeMirrorXTrap({
         sound.play(BONK_SOUND, entity.position.x, entity.position.y)
         confusion.inflict(entity, CONFUSION_TURNS)
     end,
-}))
+})

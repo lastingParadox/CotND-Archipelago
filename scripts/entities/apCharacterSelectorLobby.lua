@@ -196,8 +196,7 @@ local function isCharacterComplete(charData, character)
     return true
 end
 
--- Story bosses get their own line: with Amplified, Cadence and Nocturna would otherwise
--- read 1/2/3/4/5/DR/ND on one line and overrun the label.
+-- Story bosses get their own line, which keeps the longest labels from overrunning.
 local function getZoneStatusLines(charData, character)
     local lastZone = progression.isDLCEnabled("Amplified") and 5 or 4
     local goal = progression.getGoal()

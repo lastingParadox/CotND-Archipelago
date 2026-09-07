@@ -147,8 +147,7 @@ event.objectCharacterSwitchTo.add("apRemoveLockedInitialItems", {
     end
 end)
 
--- Outcome of the run's All Zones time limit, for the run summary to color. nil
--- means nothing was timed, so the summary stays vanilla.
+-- Outcome of the run's All Zones time limit, or nil when nothing was timed.
 function progression.getSpeedrunResult()
     return progression.speedrunResult
 end
@@ -296,8 +295,7 @@ event.runComplete.add("apHintModeComplete", { order = "menu", sequence = -1 }, f
     apClient.sendPacket({ datatype = "Hint" })
 end)
 
--- Cash the run's gold out, so gold earned on a winning run isn't simply
--- discarded when the run ends. The rate is a slot option; 0 disables it.
+-- Cashes a winning run's gold out into diamonds at the slot's rate; 0 disables it.
 event.runComplete.add("apConvertRunGold", { order = "menu", sequence = -1 }, function(ev)
     if not apUtils.isAPContext() then return end
     if not ev.summary or not ev.summary.victory then return end

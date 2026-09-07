@@ -9,8 +9,7 @@ local progression = require("AP.scripts.client.progression")
 
 local apBuffItem = {}
 
--- Ordered: entity type IDs are handed out in registration order, so every client
--- has to walk this the same way. The entity name is also the apworld's cotnd id.
+-- Ordered, since registration order fixes entity type IDs; the name is also the cotnd id.
 local CHARACTERS = {
     "Cadence", "Melody", "Aria", "Dorian", "Eli", "Monk", "Dove", "Coda", "Bolt",
     "Bard", "Nocturna", "Diamond", "Mary", "Tempo", "Reaper", "Klarinetta",
@@ -34,8 +33,7 @@ for _, character in ipairs(CHARACTERS) do
             spriteSheet = { frameX = 1, frameY = 1 },
             AP_buffItem = { character = character },
         },
-        -- No carrier. The lobby handler below covers the shrines, which stand on no AP
-        -- location and so have nowhere to record a pickup; unlocking is a flag either way.
+        -- No carrier; the lobby handler below covers the shrines, which stand on no location.
         grant = {
             item = entity,
             carrier = false,

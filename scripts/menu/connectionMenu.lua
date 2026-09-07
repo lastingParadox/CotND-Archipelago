@@ -23,8 +23,7 @@ event.menu.add("archipelagoMenuConnect", "Archipelago_Connect", function(ev)
     local localMenu = {}
     local entries = {}
 
-    -- Only the host holds the socket, so a non-host sees the lobby, the way back,
-    -- and the reason the rest is missing -- not a column of dead buttons.
+    -- A non-host sees the lobby, the way back, and the reason the rest is missing.
     local isHost = apClient.isHost()
 
     entries[1] = {

@@ -1,19 +1,19 @@
 local damage = require "necro.game.system.Damage"
 local sound  = require "necro.audio.Sound"
 
-local apFlags        = require "AP.scripts.utils.flags"
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local apFlags    = require "AP.scripts.utils.flags"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
-TrapHandler.register("InstantDeathTrap", makeSimpleTrap({
-    flyawayText = "Instant Death!",
-    before      = function() sound.playUI("necrodancerLaugh") end,
-    action      = function(entity)
+trapSystem.define({
+    name    = "InstantDeathTrap",
+    flyaway = "Instant Death!",
+    start   = function() sound.playUI("necrodancerLaugh") end,
+    apply   = function(ctx)
         damage.inflict({
-            victim     = entity,
+            victim     = ctx.entity,
             damage     = 999,
             type       = apFlags.DAMAGE_DEATH_LINK,
             killerName = "Instant Death Trap",
         })
     end,
-}))
+})

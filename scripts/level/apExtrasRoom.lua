@@ -73,8 +73,7 @@ local WALL_SPIKE = "Sync_WallSpike"
 local SPIKE_CHANCE_SETTING = "mod.Sync.levelGeneration.spikeWallChance"
 local SPIKE_CHANCE_DEFAULT = 0.08
 
--- Synchrony spikes a whole connected stone wall at this rate, and a closet's shell
--- is one such wall
+-- Synchrony spikes a whole connected stone wall at this rate, and a closet's shell is one.
 local function spikeShell(x, y, width, height, channel)
     if not ecs.getEntityPrototype(WALL_SPIKE) then return end
     if not currentLevel.isRegularFloor() then return end
@@ -173,8 +172,7 @@ local function floodOuterVoid(survey, minX, minY, width, height)
     return outer
 end
 
--- One pass up front, so testing a block is lookups rather than tile.getInfo per
--- tile per candidate position.
+-- One pass up front, so testing a block is a lookup rather than a tile.getInfo per tile.
 local function surveyRock(minX, minY, width, height)
     local survey = { carvable = {}, space = {}, floor = {}, void = {} }
     local zoneID
@@ -227,8 +225,6 @@ local function claim(x, y, width, height)
 end
 
 
----@return boolean fits, boolean usesVoid  usesVoid marks a site out in the level's
----outer margin. Void enclosed by the level counts as inside it.
 ---@return boolean fits
 ---@return boolean usesVoid  Marks a site out in the level's outer margin.
 ---@return integer sides  How many of the closet's four edges a dig can enter from.
@@ -250,8 +246,7 @@ local function closetFits(x, y, width, height, survey)
             else
                 if not survey.space[index] then return false, false, 0 end
 
-                -- Corners do not count: one only touches the interior diagonally, so
-                -- digging it opens into nothing and the closet is two digs deep.
+                -- Corners do not count, since one only touches the interior diagonally.
                 local side = (cx == x - 1 and "left")
                     or (cx == x + width and "right")
                     or (cy == y - 1 and "top")
@@ -279,8 +274,7 @@ local function closetFits(x, y, width, height, survey)
     return sides > 0, usesVoid, sides
 end
 
--- Every placement of every size, split by whether it needs the level's empty
--- margin.
+-- Every placement of every size, split by whether it needs the level's empty margin.
 local function findSpots(minX, minY, width, height, survey)
     local inside, outside = {}, {}
 
@@ -304,8 +298,7 @@ local function findSpots(minX, minY, width, height, survey)
     return inside, outside
 end
 
--- Centers of the closets already carved on this floor, so the next one can be put
--- somewhere else first.
+-- Centers of the closets already carved on this floor.
 local carvedCentres = {}
 local MIN_SEPARATION = 12
 
@@ -321,8 +314,7 @@ local function farFromCarved(spot)
     return true
 end
 
--- Spread first, centre second: spots away from the closets already carved are
--- preferred outright, and the pull inward is only a bias within whatever is left
+-- Spread first, centre second: distance from existing closets outranks the inward pull.
 local function nearestToCentre(spots, centreX, centreY, channel)
     local scored = {}
 
@@ -432,8 +424,7 @@ local function carveCloset(channel)
         end
     end
 
-    -- Anything just converted has to be backed, or a dig through it opens onto the void
-    -- it used to be.
+    -- Backs anything just converted, so a dig through it does not open onto void.
     for cx = x - 2, x + w + 1 do
         for cy = y - 2, y + h + 1 do
             local beyondShell = cx < x - 1 or cx > x + w
@@ -501,8 +492,7 @@ end
 ---Queues an entity for a room of this floor's own.
 ---@param entityType string
 ---@param attributes table|nil Spawn attributes.
----@param options table|nil    secret: carve it a closet out of rock.
----                            fallback: called when there was nowhere left to put it.
+---@param options table|nil    secret: carve a closet out of rock. fallback: called on failure.
 function apExtrasRoom.add(entityType, attributes, options)
     options = options or {}
 
@@ -531,8 +521,7 @@ event.levelLoad.add("apPlaceExtras", { order = "activationRange", sequence = -1 
     for _, entry in ipairs(contents) do
         local coord
 
-        -- A carved closet or nothing: falling through to a generated room is what
-        -- kept putting keys in the open.
+        -- A carved closet or nothing, never a fallback into a generated room.
         if entry.secret then
             local closet = carveCloset(channel)
 

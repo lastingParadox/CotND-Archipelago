@@ -1,5 +1,4 @@
 local makeMenuTrap = (require "AP.scripts.traps.factories.makeMenuTrap").makeMenuTrap
-local TrapHandler  = require "AP.scripts.traps.trapHandler"
 
 local helpTips = {
     "Helpful Tip: Moving on the beat increases your\nGroove Chain! You already knew this.",
@@ -9,12 +8,13 @@ local helpTips = {
     "Helpful Tip: These tips have been brought to you\nby the Archipelago Redux Mod. You're welcome.",
 }
 
-TrapHandler.register("HelpTrap", makeMenuTrap({
+makeMenuTrap({
+    name        = "HelpTrap",
     menuName    = "archipelagoHelpTrap",
-    flyawayText = "Help trap!",
+    flyaway     = "Help trap!",
     title       = "Helpful Tips",
     messages    = helpTips,
     buttonLabel = function(index, total)
         return "Got it! (" .. index .. "/" .. total .. ")"
     end,
-}))
+})

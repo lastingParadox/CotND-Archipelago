@@ -27,8 +27,7 @@ local function grantList(spec)
     return { spec.grant }
 end
 
----`grant` declares how the item takes effect, alongside the carrier it arrives on --
----one apGrants spec or an array of them, with `carrier` defaulting to this entity.
+---`grant` is one apGrants spec or an array, with `carrier` defaulting to this entity.
 function apItemFactory.define(spec)
     local components = {
         sprite = spriteComponent(spec),
@@ -40,8 +39,7 @@ function apItemFactory.define(spec)
     if spec.flyaway then components.AP_flyaway = { text = spec.flyaway } end
 
     for _, grant in ipairs(grantList(spec)) do
-        -- carrier = false for an item whose pickup must not claim it: marking the location
-        -- consumed there would suppress the grant that carries the effect.
+        -- carrier = false for an item whose pickup must not claim its location.
         if grant.carrier == nil then grant.carrier = spec.name end
         if grant.carrier == false then grant.carrier = nil end
 
@@ -68,7 +66,7 @@ local function firstNonEmpty(...)
     end
 end
 
----Makes a carrier wear another item's sprite, for the carriers that stand in for an item
+---Makes a carrier wear another item's sprite.
 ---@return string|nil label The item's own name, for the caller to label the disguise with.
 function apItemFactory.disguise(entity, prototype)
     if not (entity and entity.sprite and prototype and prototype.sprite) then return nil end
@@ -78,6 +76,7 @@ function apItemFactory.disguise(entity, prototype)
     end
 
     return firstNonEmpty(
+        prototype.AP_hintLabel and prototype.AP_hintLabel.text,
         prototype.itemHintLabel and prototype.itemHintLabel.text,
         prototype.friendlyName and prototype.friendlyName.name,
         prototype.name

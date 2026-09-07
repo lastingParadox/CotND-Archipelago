@@ -1,7 +1,10 @@
+local currentLevel = require "necro.game.level.CurrentLevel"
 local gameState = require "necro.client.GameState"
-local gameSession = require "necro.client.GameSession"
 local player = require "necro.game.character.Player"
+local rng = require "necro.game.system.RNG"
 local snapshot = require "necro.game.system.Snapshot"
+local turn = require "necro.cycles.Turn"
+local visualUpdate = require "necro.cycles.VisualUpdate"
 
 local apEventSync = require("AP.scripts.client.apEventSync")
 local apLog = require("AP.scripts.utils.log").apLog
@@ -25,8 +28,7 @@ function TrapHandler.register(name, fn)
     TrapHandler.traps[name] = fn
 end
 
--- Identifies one trap for as long as it is owed. A trap that has to sit out a turn is the
--- same trap next turn, and two of a kind arriving together are not each other
+-- Identifies one trap for as long as it is owed.
 local function nextTicket()
     apTrapTicket = apTrapTicket + 1
     return apTrapTicket
@@ -40,22 +42,45 @@ apEventSync.subscribe("trap", function(data)
     TrapHandler.queueTrap(data.name, data.args)
 end)
 
--- Runs the effect now if the run can take it, or leaves it queued for the first turn that
--- can
----@param ev table|nil The turn event, when the delivery arrived inside one.
-function TrapHandler.deliver(name, args, ev)
+---Delivers one trap, publishing it or running it inline depending on where it came from.
+---@param name string
+---@param args table|nil Forwarded to the effect, e.g. a forced variant.
+---@param opts table|nil `{ ev = <turn event>, host = true }`; `host` publishes to every client.
+function TrapHandler.fire(name, args, opts)
+    opts = opts or {}
+
+    if opts.host then
+        apEventSync.publish("trap", { name = name, args = args })
+        return
+    end
+
     local effect = TrapHandler.traps[name]
     local ticket = nextTicket()
 
-    if effect and apUtils.isAPContext() and effect(ev, args, ticket) then return end
+    -- Only inside a turn; anything arriving on a tick waits for the next one.
+    if opts.ev and effect and apUtils.isAPContext() and effect(opts.ev, args, ticket) then
+        visualUpdate.trigger()
+        return
+    end
 
     TrapHandler.queueTrap(name, args, ticket)
 end
 
--- Who a trap landing this instant should hit, in the turn event's own `{ entity, action }`
--- shape.
+-- Runs the effect now if the run can take it, else queues it for the first turn that can.
+---@param ev table|nil The turn event, when the delivery arrived inside one.
+function TrapHandler.deliver(name, args, ev)
+    return TrapHandler.fire(name, args, { ev = ev })
+end
+
+-- The draw a trap should make, seeded on the ticket as well as the level seed and turn.
+function TrapHandler.channel(ticket)
+    return rng.makeChannel(currentLevel.getSeed(), turn.getCurrentTurnID(), ticket or 0)
+end
+
+-- Who a trap landing this instant should hit, in the turn event's `{ entity, action }` shape.
 function TrapHandler.actingEntries(ev)
-    if ev and ev.actionQueue then return ev.actionQueue end
+    -- An empty queue is a turn nobody acted on, so fall back to every player entity.
+    if ev and ev.actionQueue and #ev.actionQueue > 0 then return ev.actionQueue end
 
     local entries = {}
     for _, entity in ipairs(player.getPlayerEntities()) do
@@ -67,7 +92,7 @@ end
 
 -- Host-only, for a trap that reaches one machine outside the simulation: TrapLink.
 function TrapHandler.publishTrap(name, args)
-    apEventSync.publish("trap", { name = name, args = args })
+    return TrapHandler.fire(name, args, { host = true })
 end
 
 function TrapHandler.clearTraps()
@@ -79,7 +104,6 @@ end
 -- Master turn event
 event.turn.add("TrapHandlerRunner", { order = "playerActions", sequence = -1 }, function(ev)
     if gameState.isInLobby() or not apUtils.isAPContext() then return end
-    if not ev.actionQueue or #ev.actionQueue == 0 then return end
 
     for i = #apTrapQueue, 1, -1 do
         local entry = apTrapQueue[i]

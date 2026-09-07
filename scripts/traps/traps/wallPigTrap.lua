@@ -1,17 +1,15 @@
-local currentLevel = require "necro.game.level.CurrentLevel"
-local object       = require "necro.game.object.Object"
-local rng          = require "necro.game.system.RNG"
-local tile         = require "necro.game.tile.Tile"
-local turn         = require "necro.cycles.Turn"
+local object    = require "necro.game.object.Object"
+local rng       = require "necro.game.system.RNG"
+local tile      = require "necro.game.tile.Tile"
+local tileTypes = require "necro.game.tile.TileTypes"
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
-local INFEST_CHANCE = 0.07
+local INFEST_CHANCE = 0.10
 local MINIMUM_PIGS  = 5
+local PIG_WALL      = "CatacombWall"
 
----Every wall a pig could face out of: it breathes down a row, so it needs floor to its
----left or right. Immutable walls are the level border and are left alone.
+---Every mutable, non-doorway wall with floor to its left or right for the pig to breathe down.
 local function candidateWalls()
     local walls = {}
     local levelX, levelY, levelW, levelH = tile.getLevelBounds()
@@ -20,7 +18,7 @@ local function candidateWalls()
         for x = levelX, levelX + levelW - 1 do
             local info = tile.getInfo(x, y)
 
-            if info.isWall and not info.immutable then
+            if info.isWall and not info.immutable and not info.isDoor then
                 local floorLeft = tile.getInfo(x - 1, y).isFloor
                 local floorRight = tile.getInfo(x + 1, y).isFloor
 
@@ -58,18 +56,26 @@ local function chooseWalls(walls, channel)
     return chosen
 end
 
-TrapHandler.register("WallPigTrap", makeSimpleTrap({
-    flyawayText   = "Wall Pig Trap!",
-    sound         = "spellFireball",
-    alwaysSucceed = true,
-    setup         = function()
+trapSystem.define({
+    name    = "WallPigTrap",
+    flyaway = "Wall Pig Trap!",
+    sound   = "spellFireball",
+    -- The infestation is the whole trap, so it counts as landed on its own.
+    start   = function(ctx)
         local walls = candidateWalls()
         if #walls == 0 then return false end
 
-        local channel = rng.makeChannel(currentLevel.getSeed() + turn.getCurrentTurnID())
+        for _, wall in ipairs(chooseWalls(walls, ctx.channel)) do
+            -- Catacomb stone under every pig, so none sits in a diggable dirt wall.
+            local zoneID = tile.getInfo(wall.x, wall.y).zoneID
+            local wallID = tileTypes.lookUpTileID(PIG_WALL, zoneID)
+                or tileTypes.lookUpTileID(PIG_WALL, 0)
 
-        for _, wall in ipairs(chooseWalls(walls, channel)) do
+            if wallID then tile.set(wall.x, wall.y, wallID) end
+
             object.spawn(wall.facesLeft and "FirepigLeft" or "FirepigRight", wall.x, wall.y)
         end
+
+        return true
     end,
-}))
+})

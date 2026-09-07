@@ -70,16 +70,14 @@ local function getReceivedMessage(item)
     return item.playername .. " found your " .. item.item_name
 end
 
--- Anything with no rule of its own is a real CotND item, so delivering it means putting it
--- on the floor.
+-- Anything with no rule of its own is a real CotND item, delivered onto the floor.
 apGrants.defineFallback({
     apply = function(_, _, ctx)
         apGrants.drop(ctx.item.item, ctx)
     end,
 })
 
--- `ev` is the turn event when one is delivering this, so an effect that needs to know who
--- acted this beat can read its action queue instead of guessing.
+-- `ev` is the turn event when one is delivering this, carrying the beat's action queue.
 local function handleItemAcquisition(item, silent, ev)
     if not item then return end
 
@@ -92,9 +90,7 @@ local function handleItemAcquisition(item, silent, ev)
         apChatBadge.addMessage(getReceivedMessage(item))
     end
 
-    -- AP_ITEM_ACTION already delivers this to every client on the same turn, so the
-    -- flyaway is raised here rather than replicated a second time. Skipped entirely for
-    -- anything taken in person: the carrier already flew its own text on pickup.
+    -- Raised locally, and skipped entirely for anything the player took in person.
     if not silent and not apItems.isOwnShopItem(item, apStorage.playerName)
         and not progression.isLocationCollected(item.location_code) then
         local text
@@ -114,9 +110,7 @@ local function handleItemAcquisition(item, silent, ev)
         end
     end
 
-    -- The carrier applies itself when it is taken in person, so a grant is the fallback.
-    -- Location codes only identify our own finds -- another CotND slot numbers its
-    -- locations identically -- so the finder has to match before we defer to that record.
+    -- The carrier applies itself when taken in person, and only our own finds are keyed here.
     if item.playername == apStorage.playerName
         and progression.isLocationConsumed(item.location_code) then
         apLog("Already applied on pickup, skipping: " .. itemId)

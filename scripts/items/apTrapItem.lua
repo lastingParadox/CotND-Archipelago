@@ -19,8 +19,7 @@ apItemFactory.define({
     },
 })
 
--- Pairs that read as each other at label size. Digit lookalikes are excluded:
--- gfx/font.png slashes its zero, flags its one, and serifs its capital I.
+-- Pairs that read as each other at label size, excluding digits the font disambiguates.
 local HOMOGLYPHS = {
     { "m", "rn" }, { "rn", "m" },
     { "w", "vv" }, { "vv", "w" },
@@ -136,12 +135,11 @@ event.objectSpawn.add("APTrapSprite", { order = "overrides", filter = "AP_trapIt
     trapEntity.AP_hintLabel = { text = getMisspelledName(label, channel) }
 end)
 
--- Every trap id, since the apworld names them rather than listing them. Fired on arrival,
--- falling back to the queue only for a trap the run cannot take yet.
+-- Every trap id, fired on arrival and queued only when the run cannot take it yet.
 apGrants.defineFamily({
     order = 10,
     match = function(itemId) return apItems.isTrapItem(itemId) end,
     apply = function(_, _, ctx)
-        trapHandler.deliver(ctx.item.item, nil, ctx.ev)
+        trapHandler.fire(ctx.item.item, nil, { ev = ctx.ev })
     end,
 })

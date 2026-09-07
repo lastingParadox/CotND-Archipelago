@@ -2,9 +2,8 @@ local action    = require "necro.game.system.Action"
 local inventory = require "necro.game.item.Inventory"
 local rng       = require "necro.game.system.RNG"
 
-local apFlyaways        = require "AP.scripts.ui.apFlyaways"
-local makeBeatStateTrap = (require "AP.scripts.traps.factories.makeBeatStateTrap").makeBeatStateTrap
-local TrapHandler       = require "AP.scripts.traps.trapHandler"
+local apFlyaways = require "AP.scripts.ui.apFlyaways"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local MY_TURN_BEATS_MIN = 10
 local MY_TURN_BEATS_MAX = 15
@@ -37,33 +36,31 @@ local function buildActions(entity, channel)
     return actions
 end
 
-TrapHandler.register("MyTurnTrap", makeBeatStateTrap({
-    name        = "MyTurnTrap",
-    flyawayText = "My Turn!",
-    statusText  = "My Turn!",
-
-    initState = function(entity, channel)
-        return { beatsRemaining = rng.range(MY_TURN_BEATS_MIN, MY_TURN_BEATS_MAX, channel) }
+trapSystem.define({
+    name      = "MyTurnTrap",
+    flyaway   = "My Turn!",
+    status    = "My Turn!",
+    perPlayer = true,
+    -- Rolled per player at trigger, so two people do not lose the same beats.
+    duration  = function(ctx)
+        return rng.range(MY_TURN_BEATS_MIN, MY_TURN_BEATS_MAX, ctx.channel)
     end,
+    tick      = function(ctx)
+        local entity       = ctx.entity
+        local chosenAction = rng.choice(buildActions(entity, ctx.channel), ctx.channel)
 
-    onTick = function(entity, entityState, stateTable, ev, channel)
-        local chosenAction = rng.choice(buildActions(entity, channel), channel)
-        local found = false
-        for _, entry in ipairs(ev.actionQueue) do
+        for _, entry in ipairs(ctx.ev.actionQueue) do
             if entry.entity and entry.entity.id == entity.id then
                 entry.action = chosenAction
-                found = true
-                break
+                return
             end
         end
-        if not found then
-            ev.actionQueue[#ev.actionQueue + 1] = { entity = entity, action = chosenAction }
-        end
 
-        entityState.beatsRemaining = entityState.beatsRemaining - 1
-        if entityState.beatsRemaining <= 0 then
-            stateTable[entity.id] = nil
-            apFlyaways.addToFlyawayQueue({ entity = entity, text = "Your turn!" })
+        ctx.ev.actionQueue[#ctx.ev.actionQueue + 1] = { entity = entity, action = chosenAction }
+    end,
+    expire    = function(ctx)
+        if ctx.entity then
+            apFlyaways.addToFlyawayQueue({ entity = ctx.entity, text = "Your turn!" })
         end
     end,
-}))
+})

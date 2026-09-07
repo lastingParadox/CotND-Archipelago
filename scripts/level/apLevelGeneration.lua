@@ -160,8 +160,7 @@ end)
 
 event.tick.add("apConnectionLostMidrun", "periodicCheck", function()
     if not apUtils.isAPContext() then return end
-    -- Session-wide: a non-host never holds the socket, so isConnected() alone
-    -- would pause them permanently.
+    -- Session-wide rather than isConnected(), which a non-host never satisfies.
     if apClient.isSessionConnected() then return end
     if menu.getName() == "Archipelago_MidRun_Connect" then return end
 

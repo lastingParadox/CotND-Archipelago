@@ -10,8 +10,7 @@ queue = script.persist(function()
     return queue
 end)
 
--- Outside the snapshot on purpose: surviving a rollback is what lets a replayed
--- turn recognise its own work.
+-- Outside the snapshot on purpose, so a replayed turn recognises its own work.
 local shownKeys = {}
 
 local BLOCKED_TEXT = "Exit stairs unlocked!"

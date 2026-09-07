@@ -2,8 +2,7 @@ local collision = require("necro.game.tile.Collision")
 local inventory = require("necro.game.item.Inventory")
 local itemBan   = require("necro.game.item.ItemBan")
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
 local SCATTER_OFFSETS = {
     { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 },
@@ -14,16 +13,18 @@ local SCATTER_OFFSETS = {
     { -3, 0 }, { 3, 0 }, { 0, -3 }, { 0, 3 },
 }
 
-TrapHandler.register("DisarmTrap", makeSimpleTrap({
-    flyawayText = "Disarmed!",
-    guard  = function(entity) return entity.inventory end,
-    voice  = "voiceConfused",
-    action = function(entity)
+trapSystem.define({
+    name    = "DisarmTrap",
+    flyaway = "Disarmed!",
+    voice   = "voiceConfused",
+    apply   = function(ctx)
+        if not ctx.entity.inventory then return false end
+
         inventory.scatter(
-            entity,
+            ctx.entity,
             SCATTER_OFFSETS,
             collision.mask(collision.Group.SOLID, collision.Type.ITEM),
             itemBan.Flag.LOSS_SCATTER
         )
     end,
-}))
+})

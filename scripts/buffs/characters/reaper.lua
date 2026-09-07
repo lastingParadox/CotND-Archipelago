@@ -33,8 +33,7 @@ local function getResilientTexture(entity)
     return RESILIENT_SPRITE
 end
 
--- recomputes CharacterSkins_textureBounds using the same formula CharacterSkins uses internally;
--- without this, textureShiftX % boundsWidth can land outside the new sheet
+-- Recomputes CharacterSkins_textureBounds with the same formula CharacterSkins uses.
 local function applyTextureBounds(entity, texture)
     if not entity.CharacterSkins_textureBounds then return end
     local sw = gfx.getImageWidth(texture)

@@ -7,8 +7,7 @@ local apInventory = require("AP.scripts.utils.apInventory")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 local progression = require("AP.scripts.client.progression")
 
--- The carrier for the potion-capacity tiers. AP_StackablePotion is the potion the
--- tiers grant, which is a different entity with a different lifetime.
+-- The carrier for the potion-capacity tiers; AP_StackablePotion is the potion they grant.
 apItemFactory.define({
     name = "AP_ProgressivePotions",
     texture = "items/progressive_potion.png",

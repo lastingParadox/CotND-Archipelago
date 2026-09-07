@@ -1,9 +1,9 @@
 {
 	"namespace": "AP",
 	"displayName": "Archipelago Redux",
-	"version": "4.0.0",
+	"version": "4.1.0",
 	"synchronyVersion": "4.1.1",
-	"description": "Updated Synchrony integration with Archipelago. Randomize your progression with a custom lobby and acquire items for other players playing alongside you!\n\nNote: This does not officially support online multiplayer! So be warned!",
+	"description": "Updated Synchrony integration with Archipelago. Randomize your progression with a custom lobby and acquire items for other players playing alongside you!\n\nNote: Online multiplayer is currently in a BETA state! If you find any issues, please report them to me! Be warned!",
 	"author": "lastingParadox",
 	"dependencies": {},
 	"api": {"scriptPath":""},
@@ -15,6 +15,6 @@
 	"homepageURL": "https://mod.io/g/crypt/m/ap",
 	"modioID": "5178782",
 	"modioUserID": 24669409,
-	"pendingVersion": "4.0.0",
+	"pendingVersion": "4.1.0",
 	"visibility": 0
 }

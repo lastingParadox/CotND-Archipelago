@@ -1,16 +1,12 @@
 local collision      = require "necro.game.tile.Collision"
 local currency       = require "necro.game.item.Currency"
-local currentLevel   = require "necro.game.level.CurrentLevel"
 local moveAnimations = require "necro.render.level.MoveAnimations"
 local object         = require "necro.game.object.Object"
-local player         = require "necro.game.character.Player"
 local rng            = require "necro.game.system.RNG"
 local sound          = require "necro.audio.Sound"
-local turn           = require "necro.cycles.Turn"
 local voice          = require "necro.audio.Voice"
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 -- Highest values first so we always try the biggest pile that fits.
 local COIN_TYPES = {
@@ -42,6 +38,41 @@ end
 local MAX_LEPRECHAUNS     = 3
 local GOLD_PER_LEPRECHAUN = 100
 
+-- The reach inventory.scatter uses: nearest ring first, widening outward.
+local SCATTER_OFFSETS = {
+    { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 },
+    { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 },
+    { -2, 0 }, { 2, 0 }, { 0, -2 }, { 0, 2 },
+    { -2, -1 }, { 2, -1 }, { -2, 1 }, { 2, 1 },
+    { -1, -2 }, { 1, -2 }, { -1, 2 }, { 1, 2 },
+    { -3, 0 }, { 3, 0 }, { 0, -3 }, { 0, 3 },
+}
+
+local SCATTER_MASK = collision.mask(collision.Group.SOLID, collision.Type.ITEM, collision.Type.TRAP)
+
+---One tile per pile, walked outward and collision-checked; overflow piles onto the first.
+local function scatterTiles(origin, count)
+    local tiles = {}
+
+    for i = 1, #SCATTER_OFFSETS do
+        if #tiles >= count then break end
+
+        local offset = SCATTER_OFFSETS[i]
+        local x, y = origin.x + offset[1], origin.y + offset[2]
+
+        if not collision.check(x, y, SCATTER_MASK) then
+            tiles[#tiles + 1] = { x, y }
+        end
+    end
+
+    local fallback = SCATTER_OFFSETS[1]
+    while #tiles < count do
+        tiles[#tiles + 1] = { origin.x + fallback[1], origin.y + fallback[2] }
+    end
+
+    return tiles
+end
+
 ---Greedy denomination breakdown; emitted largest-first.
 local function buildPiles(amount)
     local piles = {}
@@ -54,78 +85,68 @@ local function buildPiles(amount)
     return piles
 end
 
-local function spawnCoins(amount, tiles, origin, channel)
+local function spawnCoins(amount, origin)
     local piles = buildPiles(amount)
-    -- One leprechaun per 100 gold scattered (max 3), always taking the
-    -- largest piles so their bounty is worth chasing.
+    -- One leprechaun per 100 gold scattered (max 3), taking the largest piles.
     local leprechauns = math.min(MAX_LEPRECHAUNS, math.floor(amount / GOLD_PER_LEPRECHAUN), #piles)
-    local spawned = 0
+    local tiles = scatterTiles(origin, #piles)
+
     for i, pile in ipairs(piles) do
-        if #tiles == 0 then break end
-        local t = table.remove(tiles, rng.range(1, #tiles, channel))
+        local t = tiles[i]
         local coin
+
         if i <= leprechauns then
             coin = object.spawn("Leprechaun", t[1], t[2], {
                 goldCounter = { amount = pile.value },
             })
-            spawned = spawned + 1
         else
             coin = object.spawn(pile.name, t[1], t[2])
             coin.itemStack.quantity = pile.value
         end
+
         moveAnimations.play(coin, moveAnimations.Type.HOP, origin.x, origin.y)
     end
-    return spawned
+
+    return leprechauns
 end
 
-TrapHandler.register("GoldScatterTrap", makeSimpleTrap({
-    flyawayText = function(entity, ctx)
-        local leps = ctx.entityLeprechauns and ctx.entityLeprechauns[entity.id] or 0
+trapSystem.define({
+    name    = "GoldScatterTrap",
+    flyaway = function(ctx)
+        local leps = ctx.state.leprechauns[ctx.entity.id] or 0
         return leps > 0
             and ("Darn Leprechaun" .. (leps > 1 and "s!" or "!"))
             or  "Butterfingers!"
     end,
-    setup = function()
-        local targets = {}
-        for _, e in ipairs(player.getPlayerEntities()) do
-            if e and e.playableCharacter then targets[#targets + 1] = e end
-        end
-        if #targets == 0 then return false end
-
-        local sharedGold = currency.get(targets[1], currency.Type.GOLD)
+    start   = function(ctx)
+        local targets = ctx.players
+        local sharedGold = currency.get(targets[1].entity, currency.Type.GOLD)
         if sharedGold <= 0 then return false end
 
-        local channel   = rng.makeChannel(currentLevel.getSeed() + turn.getCurrentTurnID())
-        local totalLoss = calculateLoss(sharedGold, channel)
+        local totalLoss = calculateLoss(sharedGold, ctx.channel)
         if totalLoss <= 0 then return false end
 
-        currency.subtract(targets[1], currency.Type.GOLD, totalLoss)
+        currency.subtract(targets[1].entity, currency.Type.GOLD, totalLoss)
 
-        local perPlayer = math.floor(totalLoss / #targets)
-        local remainder = totalLoss % #targets
-        return {
-            channel          = channel,
-            perPlayer        = perPlayer,
-            remainder        = remainder,
-            index            = 0,
-            entityLeprechauns = {},
-        }
+        ctx.state.perPlayer   = math.floor(totalLoss / #targets)
+        ctx.state.remainder   = totalLoss % #targets
+        ctx.state.index       = 0
+        ctx.state.leprechauns = {}
     end,
-    action = function(entity, ctx)
-        ctx.index = ctx.index + 1
-        local share = ctx.perPlayer + (ctx.index <= ctx.remainder and 1 or 0)
+    apply   = function(ctx)
+        local entity = ctx.entity
+        local state  = ctx.state
+
+        state.index = state.index + 1
+        local share = state.perPlayer + (state.index <= state.remainder and 1 or 0)
         local leps  = 0
+
         if share > 0 then
-            local tiles = collision.getVacantTiles(
-                entity, 1, 6, 6, false,
-                collision.mask(collision.Group.SOLID, collision.Type.TRAP)
-            )
-            if #tiles > 0 then
-                leps = spawnCoins(share, tiles, entity.position, ctx.channel)
-            end
+            leps = spawnCoins(share, entity.position)
         end
-        ctx.entityLeprechauns[entity.id] = leps
+
+        state.leprechauns[entity.id] = leps
         voice.play(entity, entity.voiceSlideStart)
         sound.playFromEntity("iceSlip", entity, { volume = 20, pitch = 1.5 })
     end,
-}))
+})

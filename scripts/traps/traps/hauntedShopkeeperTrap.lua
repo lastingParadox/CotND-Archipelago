@@ -2,8 +2,7 @@ local collision = require "necro.game.tile.Collision"
 local marker    = require "necro.game.tile.Marker"
 local object    = require "necro.game.object.Object"
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local function positionKey(x, y)
     return tostring(x) .. "," .. tostring(y)
@@ -29,21 +28,22 @@ local function findSpawnPosition(anchorX, anchorY, usedPositions)
     return nil, nil
 end
 
-TrapHandler.register("HauntedShopkeeperTrap", makeSimpleTrap({
-    flyawayText = "Haunted Shopkeeper!",
-    setup = function()
-        -- Anchor on the level exit stairs. Use the STAIRS marker, which is
-        -- present whether or not a miniboss still locks the exit (LockedStairs
-        -- inherits it from Stairs) — unlike transformOnMinibossDeath, which only
-        -- exists while a boss/miniboss holds the exit. The ring walk in
-        -- findSpawnPosition spreads multiple ghosts out from the anchor.
+trapSystem.define({
+    name    = "HauntedShopkeeperTrap",
+    flyaway = "Haunted Shopkeeper!",
+    -- Anchors on the STAIRS marker, which is present whether or not a miniboss locks the exit.
+    start   = function(ctx)
         local x, y = marker.lookUpFirst(marker.Type.STAIRS)
         if not x then return false end
-        return { anchorX = x, anchorY = y, used = {} }
+
+        ctx.state.anchorX = x
+        ctx.state.anchorY = y
+        ctx.state.used    = {}
     end,
-    action = function(entity, ctx)
-        local x, y = findSpawnPosition(ctx.anchorX, ctx.anchorY, ctx.used)
+    apply   = function(ctx)
+        local x, y = findSpawnPosition(ctx.state.anchorX, ctx.state.anchorY, ctx.state.used)
         if not x then return false end
+
         object.spawn("ShopkeeperGhost", x, y)
     end,
-}))
+})

@@ -33,6 +33,32 @@ local function attach(progression)
         end
     end
 
+    -- Required here rather than at module scope: the cycle through apCharacters must stay run-time.
+    function progression.isCharacterPlayable(character)
+        local apCharacters = require("AP.scripts.utils.apCharacters")
+        local startingCharacter = progression.getStartingCharacter()
+
+        if startingCharacter and not progression.hasCharacterRoomKey() and character ~= startingCharacter then
+            return false
+        end
+
+        return apCharacters.isCharacterPlayable(apCharacters.apLocationToCotNDChar(character))
+    end
+
+    function progression.getPlayableCharacters()
+        local result = {}
+
+        for character in pairs(characterCache) do
+            if progression.isCharacterPlayable(character) then
+                result[#result + 1] = character
+            end
+        end
+
+        table.sort(result)
+
+        return result
+    end
+
     function progression.getCharacterBlacklist(character)
         local blacklist = apStorage.saveData.characterBlacklist or {}
         if character then
@@ -54,8 +80,7 @@ local function attach(progression)
         return apStorage.saveData.includeUniqueItems
     end
 
-    -- { normal = { "CharmNazar", ... }, unique = { ... } } for one CotND character, already
-    -- stripped of anything this slot's DLC leaves out of the pool.
+    -- { normal = { "CharmNazar", ... }, unique = { ... } } for one CotND character.
     function progression.getCharacterRequirements(name)
         local requirements = apStorage.saveData.characterRequirements or {}
         return requirements[name] or {}

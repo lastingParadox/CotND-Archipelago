@@ -6,8 +6,7 @@ local apGrants = require("AP.scripts.items.apGrants")
 local apInventory = require("AP.scripts.utils.apInventory")
 local progression = require("AP.scripts.client.progression")
 
--- The upgrades have no carrier of their own: they raise a permanent total rather than
--- becoming an item, so they are only ever granted.
+-- The upgrades raise a permanent total rather than becoming an item, so they have no carrier.
 
 apGrants.define({
     item = "PermHeart2",
@@ -24,8 +23,7 @@ apGrants.define({
     end,
 })
 
--- The chest upgrades are read at level load and the coin multipliers are equipped with the
--- starting inventory, so neither drops as a floor item; re-equipping is the whole grant.
+-- Neither drops as a floor item, so re-equipping is the whole grant.
 apGrants.defineFamily({
     order = 5,
     match = function(itemId)

@@ -189,9 +189,7 @@ local function sellable(proto, npc)
     return true
 end
 
--- Variants the player owns the makings of but not the weapon itself: a base shape they
--- have, plus a material they have. Built from the base list, so composites of composites
--- never arise.
+-- Variants combining a base shape and a material the player already owns.
 local function compositeWeapons(itemsList, bases, excluded)
     local composites = {}
 

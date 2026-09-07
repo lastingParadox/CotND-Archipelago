@@ -10,10 +10,7 @@ handlers.register("Handshake", function(message, ctx)
     ctx.seed = seed
     ctx.playerName = playerName
 
-    -- Initialise a fresh in-memory session when the seed/player/slot changes (or
-    -- on the very first connection).  For within-session TCP reconnects the
-    -- script.persist state is kept so that already-processed items are not
-    -- re-triggered and the receivedItems dedup table remains intact.
+    -- A changed seed/player/slot starts a fresh session; a reconnect keeps the persisted one.
     if apStorage.seedName ~= seed
         or apStorage.playerName ~= playerName
         or apStorage.slot ~= slot then
@@ -23,9 +20,7 @@ handlers.register("Handshake", function(message, ctx)
         apLog("Reconnecting for player " .. playerName .. " (seed: " .. seed .. ").")
     end
 
-    -- Items the mod has already processed this session (0 on a fresh start).
-    -- Reported so the AP client can distinguish genuinely-new traps from ones
-    -- that were already in flight before a TCP drop.
+    -- Items the mod has already processed this session, 0 on a fresh start.
     local lastApIndex = 0
     local receivedItems = (apStorage.saveData or {}).receivedItems or {}
     for k, _ in pairs(receivedItems) do
@@ -35,8 +30,7 @@ handlers.register("Handshake", function(message, ctx)
         end
     end
 
-    -- Always request full state; without a local save file the AP server is the
-    -- sole source of truth, so every (re)connect starts from scratch.
+    -- Always requests full state, since there is no local save file to start from.
     ctx.sendPacket({
         datatype = "State",
         init = true,

@@ -2,8 +2,7 @@ local commonItem = require "necro.game.data.item.CommonItem"
 
 local apUtils = require("AP.scripts.utils.apUtils")
 
--- Shapes Amplified skips (throwable/reloadable). Matched on components, not
--- ev.flags, so generated variants like the Trident's are covered.
+-- Throwable and reloadable shapes Amplified skips, matched on components rather than ev.flags.
 local MATERIAL_SHAPES = {
     Dagger = true,
     Spear = true,

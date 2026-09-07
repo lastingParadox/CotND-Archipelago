@@ -1,22 +1,12 @@
-local gameWindow       = require("necro.config.GameWindow")
-local settingsStorage  = require("necro.config.SettingsStorage")
-local timer            = require("system.utils.Timer")
+local gameWindow      = require("necro.config.GameWindow")
+local settingsStorage = require("necro.config.SettingsStorage")
 
-local makeCameraTrap = (require "AP.scripts.traps.factories.makeCameraTrap").makeCameraTrap
-local TrapHandler    = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
 local DURATION        = 20
 local trapResolution  = { width = 256, height = 144 }
 local trapScaleFactor = 1
 local trapScaleMode   = gameWindow.ScaleMode.FIXED
-
-local trapTimestamp      = 0
-local originalResolution = nil
-local originalScaleFactor = nil
-local originalScaleMode  = nil
-trapTimestamp, originalResolution, originalScaleFactor, originalScaleMode = script.persist(function()
-    return trapTimestamp, originalResolution, originalScaleFactor, originalScaleMode
-end)
 
 local function normalizeScaleMode(scaleMode)
     if scaleMode == nil then return nil end
@@ -61,49 +51,36 @@ local function getConfiguredScale()
     return { scaleFactor = scaleFactor, scaleMode = scaleMode }
 end
 
-local function restoreResolution()
-    if not originalResolution then return end
-    local restored = setDisplaySettings(
-        originalResolution.width, originalResolution.height,
-        originalScaleFactor, originalScaleMode
-    )
-    if restored then
-        originalResolution  = nil
-        originalScaleFactor = nil
-        originalScaleMode   = nil
-    end
-end
-
-TrapHandler.register("144pTrap", makeCameraTrap({
-    name        = "144pTrap",
-    flyawayText = "144p!",
-    duration    = DURATION,
-
-    isActive     = function() return trapTimestamp ~= 0 end,
-    getTimestamp = function() return trapTimestamp end,
-    setTimestamp = function(t) trapTimestamp = t end,
-
-    -- Save original display settings and apply 144p on trigger.
-    -- Return false to cancel if settings cannot be read (defensive guard).
-    onTrigger = function()
+trapSystem.define({
+    name     = "144pTrap",
+    flyaway  = "144p!",
+    duration = DURATION,
+    clock    = trapSystem.Clock.REAL,
+    -- Window settings, which must survive a rollback rather than snap back.
+    storage  = trapSystem.Storage.VOLATILE,
+    -- Saves the original display settings and applies 144p, aborting if they cannot be read.
+    start    = function(ctx)
         local currentResolution = getConfiguredResolution()
         if not currentResolution then return false end
-        local currentScale = getConfiguredScale()
-        originalResolution  = { width = currentResolution.width, height = currentResolution.height }
-        if currentScale then
-            originalScaleFactor = currentScale.scaleFactor
-            originalScaleMode   = currentScale.scaleMode
-        end
-        local applied = setDisplaySettings(
-            trapResolution.width, trapResolution.height,
-            trapScaleFactor, trapScaleMode
-        )
-        if not applied then return false end
-    end,
 
-    -- Re-enforce 144p each tick in case the player manually resizes.
-    tickEffect = function()
-        local cur = getConfiguredResolution()
+        ctx.state.resolution = { width = currentResolution.width, height = currentResolution.height }
+
+        local currentScale = getConfiguredScale()
+        if currentScale then
+            ctx.state.scaleFactor = currentScale.scaleFactor
+            ctx.state.scaleMode   = currentScale.scaleMode
+        end
+
+        if not setDisplaySettings(trapResolution.width, trapResolution.height,
+                trapScaleFactor, trapScaleMode) then
+            return false
+        end
+
+        return true
+    end,
+    -- Re-enforce 144p in case the player manually resizes.
+    tick     = function()
+        local cur   = getConfiguredResolution()
         local scale = getConfiguredScale()
         if not cur or not scale
             or cur.width  ~= trapResolution.width
@@ -113,9 +90,12 @@ TrapHandler.register("144pTrap", makeCameraTrap({
             setDisplaySettings(trapResolution.width, trapResolution.height, trapScaleFactor, trapScaleMode)
         end
     end,
+    expire   = function(ctx)
+        if not ctx.state.resolution then return end
 
-    onExpire = restoreResolution,
-    -- onExit: expire() already calls onExpire (= restoreResolution), so no additional teardown needed.
-    -- The handler is still registered by passing a no-op so the factory sets up event.exit.
-    onExit = function() end,
-}))
+        setDisplaySettings(
+            ctx.state.resolution.width, ctx.state.resolution.height,
+            ctx.state.scaleFactor, ctx.state.scaleMode
+        )
+    end,
+})

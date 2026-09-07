@@ -1,13 +1,15 @@
 local sizeModifier = require "necro.game.character.SizeModifier"
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local SHRINK_TURNS = 12
 
-TrapHandler.register("ShrinkTrap", makeSimpleTrap({
-    flyawayText = "Shrunk!",
-    sound       = "potionBlue",
-    guard       = function(entity) return entity.dwarfism end,
-    action      = function(entity) sizeModifier.shrink(entity, SHRINK_TURNS) end,
-}))
+trapSystem.define({
+    name    = "ShrinkTrap",
+    flyaway = "Shrunk!",
+    sound   = "potionBlue",
+    apply   = function(ctx)
+        if not ctx.entity.dwarfism then return false end
+        sizeModifier.shrink(ctx.entity, SHRINK_TURNS)
+    end,
+})

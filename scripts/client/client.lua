@@ -7,11 +7,8 @@ local netplay = require "necro.network.Netplay"
 local orderedSelector = require "system.events.OrderedSelector"
 local playerList = require "necro.client.PlayerList"
 local resources = require "necro.client.Resources"
-local singlePlayer = require "necro.client.SinglePlayer"
 
--- Only the host holds the socket to the Archipelago client, so it mirrors the
--- session state here for everyone else. A resource rather than a player
--- attribute because level transitions block on resources.allTransfersDone(),
+-- The host mirrors its session state here for everyone else.
 local AP_STATE = netplay.Resource.extend("APState")
 
 local apChatBadge = require("AP.scripts.ui.apChatBadge")
@@ -100,8 +97,7 @@ function apClient.isHost()
     return hostID ~= nil and localID ~= nil and hostID == localID
 end
 
--- Whether Archipelago is available to this session at all. The host owns the
--- socket; everyone else reads the replicated state, which transitions wait on.
+-- Whether Archipelago is available to this session at all.
 function apClient.isSessionConnected()
     if apClient.isHost() then
         return apClient.isConnected()

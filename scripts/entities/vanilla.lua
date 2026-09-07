@@ -2,7 +2,6 @@ local ecs = require "system.game.Entities"
 local inventory = require "necro.game.item.Inventory"
 local hasDynChar, _ = pcall(require, "DynChar.DynCharSchema")
 local itemBan = require "necro.game.item.ItemBan"
-local itemPickup = require("necro.game.item.ItemPickup")
 local itemSlot = require "necro.game.item.ItemSlot"
 local settingsStorage = require "necro.config.SettingsStorage"
 local utils = require "system.utils.Utilities"
@@ -50,7 +49,7 @@ event.entitySchemaLoadItem.add("addAPComponents", { order = "common", sequence =
 end)
 
 -- Keys free a caged NPC, so a check taking one would strand that unlock.
-event.entitySchemaLoadItem.add("apProtectKeys", { order = "overrides", sequence = 1 }, function(ev)
+event.entitySchemaLoadItem.add("apProtectKeys", { order = "namedOverrides", sequence = 1 }, function(ev)
     if ev.entity.itemKey then ev.entity.AP_noReplace = {} end
 end)
 
@@ -61,9 +60,7 @@ event.entitySchemaLoadEntity.add("apTridentComponents", { order = "overrides", s
     end
 end)
 
--- Every cageable lobby NPC, mapped to its AP item/location name. An empty name
--- means cageable but not randomised, which is what separates these from the five
--- the apworld actually ships as items.
+-- Every cageable lobby NPC mapped to its AP name; empty means cageable but not randomised.
 local npcNames = {
     Beastmaster   = "",
     Hephaestus    = "",
@@ -76,8 +73,7 @@ local npcNames = {
     Trainer       = "Codex",
 }
 
--- Prototypes a zone item can hide in. Storage-carrying enemies are deliberately absent:
--- a Leprechaun holding an item is not something the player opens.
+-- Prototypes a zone item can hide in, excluding storage-carrying enemies.
 local containers = {
     ChestRed    = "chest",
     ChestPurple = "chest",
@@ -145,7 +141,6 @@ event.entitySchemaLoadEntity.add("playerAPItem", { order = "overrides", sequence
         e.itemSlot = { name = "misc" }
         e.inventoryCursedSlots = e.inventoryCursedSlots or {}
         e.AP_damageCountdown = {}
-        e.AP_followerChain = {}
 
         e.rotatedSprite = e.rotatedSprite or {}
 
@@ -187,18 +182,35 @@ local excludeCharacters = {
     Sync_Chaunter = true,
 }
 
+-- Bounds the teleport to homeArea, the arena Coral Riff spawned in, rather than the segment.
+event.entitySchemaLoadNamedEntity.add("apCoralRiffTeleportWithinArena", {
+    key = "SpellcastTeleportCoralRiff",
+}, function(ev)
+    ev.entity.spellcastTeleportToSegment = false
+    ev.entity.spellcastTeleportToHome = {}
+end)
+
+local function unbannedComponents(entity)
+    local unbanned = entity.inventoryUnbannedItems
+
+    if not unbanned then
+        unbanned = {}
+        entity.inventoryUnbannedItems = unbanned
+    end
+
+    unbanned.components = unbanned.components or {}
+
+    return unbanned.components
+end
+
 event.entitySchemaLoadNamedEntity.add("apKlarinettaUnbanZweihander", {
     key = "Sync_Klarinetta",
 }, function(ev)
-    -- The mask, not a boolean: FULL also clears the itemGlobalBan her own starting
-    -- Zweihaender now carries. A non-numeric value here would fall back to FULL anyway,
-    -- but only by accident.
-    ev.entity.inventoryUnbannedItems = {
-        components = {
-            Sync_weaponCollisionCheck  = itemBan.Type.FULL,
-            AP_klarinettaWeaponScroll  = itemBan.Type.FULL,
-        },
-    }
+    local unbanned = unbannedComponents(ev.entity)
+
+    -- The explicit FULL mask, which also clears the itemGlobalBan the Zweihaender carries.
+    unbanned.Sync_weaponCollisionCheck = itemBan.Type.FULL
+    unbanned.AP_klarinettaWeaponScroll = itemBan.Type.FULL
 end)
 
 event.entitySchemaLoadNamedEntity.add("apScrollEnchantWeaponKlarinetta", {
@@ -382,9 +394,7 @@ event.entitySchemaLoadItem.add("apUniqueItemGeneration", { order = "overrides", 
             e.AP_itemPoolLockedShop = { weights = data.shopChance }
         end
 
-        -- Character banlists key off ban components; unique items that skip the
-        -- normal type components (see WeaponGoldenLute) need them added back so
-        -- restricted characters exclude them from AP generation.
+        -- Restores the ban components that unique items skip, so character banlists see them.
         if data.bans then
             for _, banComponent in ipairs(data.bans) do
                 e[banComponent] = e[banComponent] or {}
@@ -393,22 +403,32 @@ event.entitySchemaLoadItem.add("apUniqueItemGeneration", { order = "overrides", 
     end
 end)
 
--- Golden Lute
+-- Items a character may take and use whatever their bans say; generation stays banned.
+local unbannedItems = {
+    WeaponGoldenLute = true,
+}
 
-event.entitySchemaLoadPlayer.add("apGoldenLuteKeepable", { order = "overrides" }, function(ev)
-    local unbanned = ev.entity.inventoryUnbannedItems
+event.entitySchemaLoadEntity.add("apUnbannedItems", { order = "itemBans" }, function(ev)
+    if not ev.entity.playableCharacter then return end
 
-    if not unbanned then
-        unbanned = { components = {} }
-        ev.entity.inventoryUnbannedItems = unbanned
-    end
-
-    unbanned.components = unbanned.components or {}
-    unbanned.components["itemGoldenLute"] = itemBan.Type.USE_ALL
+    ev.entity.AP_unbannedItems = { items = unbannedItems }
 end)
 
-event.objectTryCollectItem.add("apGoldenLuteIgnoreBans", { order = "ignoreBans" }, function(ev)
-    if ev.item.itemGoldenLute then
+-- After vanilla's own unbanByComponent, which is the last word on the mask.
+event.itemBanCheck.add("apUnbanItems", {
+    filter = "AP_unbannedItems",
+    order = "unbanComponent",
+    sequence = 1,
+}, function(ev)
+    if ev.holder.AP_unbannedItems.items[ev.item.name] then
+        ev.mask = itemBan.Flag.unmask(ev.mask, itemBan.Type.USE_ALL)
+    end
+end)
+
+event.objectTryCollectItem.add("apUnbannedIgnoreBans", { order = "ignoreBans" }, function(ev)
+    local unbanned = ev.entity.AP_unbannedItems
+
+    if unbanned and unbanned.items[ev.item.name] then
         ev.ignoreBans = true
     end
 end)
@@ -419,11 +439,9 @@ event.entitySchemaLoadNamedEntity.add("apMarv", { order = "overrides", sequence 
     ev.entity.inventory = {}
     ev.entity.itemUser = {}
     ev.entity.itemCollector = {}
-    ev.entity.AP_followerChain = {}
 
     ev.entity.AP_followerDamageParentWhileDead = {}
-    -- Declares the deathlink-source name tag so death.lua can set it and
-    -- apRenderMarvDeathLinkTags can draw it above the Marv.
+    -- The deathlink-source name tag death.lua sets and apRenderMarvDeathLinkTags draws.
     ev.entity.AP_marvDeathLinkTag = {}
 end)
 

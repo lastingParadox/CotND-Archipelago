@@ -62,8 +62,7 @@ event.entitySchemaLoadEntity.add("apPawnbrokerPricing", "overrides", function(ev
     end
 end)
 
--- Vision is a party union, so the engine never records who revealed it; nearest
--- player is the closest stand-in.
+-- Nearest player stands in for the revealer, since vision is a party union.
 local function pawnbrokerCost(item)
     local gold
     if currency.isShared(currency.Type.GOLD) then
@@ -165,8 +164,7 @@ local function replacePlacedItem(item, genArgs)
     return true
 end
 
--- A shrine writes its fixed offers straight into itself, so they never reach the generation
--- filter. Everything it laid out is tagged with its own ID.
+-- A shrine tags its fixed offers with its own ID, since they never reach the generation filter.
 local function replaceUnavailableOffers(ev, genArgs)
     local offers = {}
 
@@ -203,8 +201,7 @@ event.shrine.override("blood", function(func, ev)
     end
 end)
 
--- initializeParameters assigns ev.filter outright, so a caller cannot pass one in; this
--- reads a name set off the request instead. Sequence 4: after the ownership filter.
+-- Reads a name set off the request, since initializeParameters assigns ev.filter outright.
 event.itemGenerate.add("apExcludeNamedItems", { order = "initParameters", sequence = 4 }, function(ev)
     local excluded = ev.AP_excludeNames
     if not excluded then return end
@@ -216,8 +213,7 @@ event.itemGenerate.add("apExcludeNamedItems", { order = "initParameters", sequen
     end
 end)
 
--- Every piece of glass gear the shop can stand in for. A superset of its own four, so an
--- unlocked Glass Jaw can fill a slot the shop would never have offered it for.
+-- Every piece of glass gear the shop can stand in for, a superset of its own four.
 local GLASS_STOCK = {
     "ArmorGlass",
     "ArmorHeavyglass",
@@ -258,8 +254,7 @@ local function draw(pool, channel)
     return pool[rng.int(#pool, channel) + 1]
 end
 
--- Only once both fresh pools are dry: gear and one weapon roll share the draw, so the
--- repeat can be either.
+-- Only once both fresh pools are dry, drawing a repeat from either.
 local function drawGlassDuplicate(ev, channel)
     local pool = unlockedGlassGear(nil)
     local weapon = generatedGlassWeapon(ev, nil)
@@ -269,8 +264,7 @@ local function drawGlassDuplicate(ev, channel)
     return draw(pool, channel)
 end
 
--- The glass shop takes two of its items straight off its own list, so those never reach the
--- filter above and can be things the player has not unlocked.
+-- The glass shop takes two items off its own list, which never reach the filter above.
 event.generateShopItems.add("apGlassShopUnlocks", {
     filter = "generateShopGlass",
     order = "all",
@@ -289,8 +283,7 @@ event.generateShopItems.add("apGlassShopUnlocks", {
 
     for index, itemName in ipairs(ev.items) do
         if not isAvailableItem(itemName) then
-            -- Anything the shop is not already showing first, gear before weapon; only then
-            -- a repeat, and failing that the shard nobody can lock.
+            -- Unshown gear, then unshown weapon, then a repeat, then the shard nobody can lock.
             local replacement = draw(unlockedGlassGear(offered), channel)
                 or generatedGlassWeapon(ev, offered)
                 or drawGlassDuplicate(ev, channel)

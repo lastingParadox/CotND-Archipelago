@@ -1,7 +1,6 @@
 local turn = require "necro.cycles.Turn"
 
--- Deliberately not snapshot-managed: outliving the rollback is what lets a
--- replayed turn recognise work it already did.
+-- Deliberately not snapshot-managed, so a replayed turn can recognise work it already did.
 local applied = {}
 
 local apReplay = {}
@@ -11,8 +10,7 @@ local function entryFor(key)
     return turnID and (turnID .. "\0" .. tostring(key)) or nil
 end
 
----True the first time it is called with `key` during the current turn, false for
----every replay of that turn. Always true outside a turn, where nothing replays.
+---True the first time `key` is seen this turn, false on every replay of it.
 function apReplay.firstThisTurn(key)
     local entry = entryFor(key)
     if not entry then return true end
@@ -28,8 +26,7 @@ function apReplay.mark(key)
     if entry then applied[entry] = true end
 end
 
----True if `key` was already marked during this turn, i.e. we are in a replay of
----the turn that did the work.
+---True if `key` was already marked this turn.
 function apReplay.seen(key)
     local entry = entryFor(key)
     return entry ~= nil and applied[entry] == true

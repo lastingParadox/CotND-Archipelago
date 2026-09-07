@@ -8,31 +8,24 @@ local turn = require "necro.cycles.Turn"
 local apClient = require("AP.scripts.client.client")
 local apLog = require("AP.scripts.utils.log").apLog
 
--- Separate from APState so an event uploads the moment it arrives rather than
--- waiting on that payload's throttle and dragging the whole save with it.
+-- Separate from APState so an event uploads the moment it arrives, unthrottled.
 local AP_EVENTS = netplay.Resource.extend("APEvents")
 
--- Only the Archipelago host holds the socket, so it is the only one that learns of
--- a deathlink or a traplink trap. It stamps each with the turn it happened on and
--- publishes; every client applies on that same turn, so the effect is part of the
--- simulation rather than one machine's local state.
+-- The host stamps each event with the turn it happened on; every client applies it there.
 local published = {}
 local nextEventID = 1
 published, nextEventID = script.persist(function() return published, nextEventID end)
 
--- Rollback-managed: a rewind past an event has to let it apply again, or the
--- resimulation drops the effect the original pass produced.
+-- Rollback-managed, so a rewind past an event lets it apply again.
 apEventsApplied = snapshot.variable({}, true)
 
--- Entries older than this stop being republished. Long enough to cover a rollback
--- window, short enough that the payload cannot grow without bound over a run.
+-- Entries older than this stop being republished.
 local RETAIN_TURNS = 600
 
 local apEventSync = { RESOURCE = AP_EVENTS }
 local subscribers = {}
 
----Registers what to do when an event of this kind reaches its turn. Runs on every
----client, so it must only touch simulated state.
+---Registers what to do when an event of this kind reaches its turn, on every client.
 function apEventSync.subscribe(kind, apply)
     subscribers[kind] = apply
 end
@@ -51,7 +44,7 @@ local function upload()
     resources.uploadIfChanged(AP_EVENTS, "APEvents", published)
 end
 
----Host-only. Off the network this is just a local queue, which is the same path.
+---Host-only; off the network this is a local queue on the same path.
 ---@param kind string Matching a subscribe() registration.
 ---@param data table|nil Serialised to every client as-is.
 function apEventSync.publish(kind, data)
@@ -89,13 +82,10 @@ local function applyDue()
     end
 end
 
--- Ahead of TrapHandler's runner, so a trap published this turn is queued in time
--- for the same turn's drain.
+-- Ahead of TrapHandler's runner, so a trap published this turn makes the same turn's drain.
 event.turn.add("apApplySyncedEvents", { order = "playerActions", sequence = -2 }, applyDue)
 
--- The host applied on the turn it stamped; a joiner learning of it later rewinds to
--- that turn and resimulates, the same correction the engine runs for late player
--- input. That is what removes the need to schedule events into the future.
+-- A joiner learning of an event late rewinds to its turn and resimulates.
 event.resourceLoaded.add("apRewindToSyncedEvents", AP_EVENTS, function()
     if apClient.isHost() then return end
 

@@ -60,10 +60,7 @@ for name in pairs(AMPLIFIED_SUPPRESSED) do
         end)
 end
 
--- The engine will not generate a shrine its holder is banned from: Bard never meets the
--- rhythm shrines, Aria and Coda never meet the ones that cost health. Swapping a locked
--- shrine has to honour that too, or the replacement is one the party cannot use. Mirrors
--- ShrineGeneration's own filter rather than restating the ban table.
+-- Mirrors ShrineGeneration's own filter, so a swapped shrine is one the party can use.
 local function allowedForParty(proto)
     local players = player.getPlayerEntities()
     if #players == 0 then return true end
@@ -77,10 +74,7 @@ local function allowedForParty(proto)
     return false
 end
 
--- shrineGeneration.choice adds "sale" and "!shrinePoolExcludeFromShriner" to its required
--- components when asked for a shriner pool, which is what keeps Sacrifice, Pain, the Feast
--- and Fire (all unsellable) plus Chance out of his stock. Mirrors that rather than
--- restating the list.
+-- Mirrors the "sale" and "!shrinePoolExcludeFromShriner" filter shrineGeneration.choice adds.
 local function shrinerEligible(proto)
     if not proto.sale or proto.shrinePoolExcludeFromShriner then return false end
     if player.getCount() < 2 and proto.shrinePoolExcludeFromSinglePlayer then return false end
@@ -167,8 +161,7 @@ local function pickShrine(names, present, channel)
     return #choices > 0 and rng.choice(choices, channel) or nil
 end
 
--- Every shrine is precollected when the slot does not randomise them, so this
--- replaces nothing in that case without needing to know the option.
+-- Every shrine is precollected when the slot does not randomise them, so this replaces nothing.
 event.levelLoad.add("apReplaceLockedShrines", { order = "shrines", sequence = 1 }, function()
     if not apUtils.isAPContext() then return end
 
@@ -230,8 +223,7 @@ event.levelLoad.add("apReplaceLockedShrines", { order = "shrines", sequence = 1 
     end
 end)
 
--- Snapshotted here rather than at the end of the pass above, which returns early whenever
--- there is no suppressed pool, and refreshed per level because entity ids get reused.
+-- Snapshotted per level, since entity ids are reused between them.
 event.levelLoad.add("apSnapshotLevelShrines", { order = "secretRoom", sequence = -1 }, function()
     levelShrines = {}
 
@@ -279,8 +271,7 @@ event.objectInteract.add("apSendShrineCheck", { filter = "shrine", order = "acti
     if ev.suppressed or not apUtils.isAPContext() then return end
     if not progression.getShrineChecks() then return end
 
-    -- Not shrine.active: activateShrine sets it, then fires the shrine event, and a
-    -- Shrine of Fire taking explosive damage clears it again as it is destroyed.
+    -- Not shrine.active, which a shrine destroyed by its own activation clears again.
     if ev.result ~= action.Result.INTERACT then return end
 
     local location = SHRINE_LOCATIONS[ev.entity.name]
@@ -295,8 +286,7 @@ event.objectInteract.add("apSendShrineCheck", { filter = "shrine", order = "acti
     progression.sendLocationChecks(location)
 end)
 
--- Spawning the entity would drop an activatable shrine at the player's feet, so a granted
--- shrine only ever unlocks the right to generate one.
+-- A granted shrine unlocks the right to generate one rather than spawning it.
 apGrants.defineFamily({
     order = 30,
     match = function(itemId) return SHRINE_LOCATIONS[itemId] ~= nil end,

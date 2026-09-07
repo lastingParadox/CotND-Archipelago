@@ -115,8 +115,7 @@ event.holderPerformAttack.add("apMikuBuffComboGrant", {
     end
 end)
 
--- Pre/post handlers around vanilla renderComboBar (sequence 0).
--- Pre sets equipped=false so vanilla skips Miku's leek; post restores and draws buffed 3-blip version.
+-- Pre unequips the leek so vanilla renderComboBar skips it; post restores and draws 3 blips.
 local cachedLeek   = nil
 local cachedHolder = nil
 

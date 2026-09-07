@@ -29,8 +29,7 @@ local function matchCharacterZone(location, saveData)
     local character, zone = match(location, PATTERNS.ZONE_ONLY)
     if character then return character, zone end
 
-    -- Floor checks carry no zone-clear meaning; the "Zone N" check is the only
-    -- thing that marks a zone complete.
+    -- Only the "Zone N" check marks a zone complete; floor checks do not.
     character, zone = match(location, PATTERNS.ZONE_FLOOR)
     if character then return character, nil end
 

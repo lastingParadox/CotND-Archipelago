@@ -15,8 +15,7 @@ apItemFactory.define({
         },
     },
     grant = {
-        -- Both denominations share the one carrier, which is spawned carrying its own
-        -- value, so the pickup reads the amount off the entity rather than off the id.
+        -- Both denominations share one carrier, so the amount is read off the entity.
         {
             apply = function(_, item) progression.grantGold(item.AP_currency.value) end,
         },

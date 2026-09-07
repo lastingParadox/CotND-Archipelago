@@ -1,14 +1,10 @@
 local currentLevel = require "necro.game.level.CurrentLevel"
 local ecs          = require "system.game.Entities"
 local object       = require "necro.game.object.Object"
-local snapshot     = require "necro.game.system.Snapshot"
 local tile         = require "necro.game.tile.Tile"
 
-local apLog          = require("AP.scripts.utils.log").apLog
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
-
-apMarketCrashActive = snapshot.runVariable(false)
+local apLog      = require("AP.scripts.utils.log").apLog
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local function closeShops()
     local saleItems = {}
@@ -39,21 +35,19 @@ local function closeShops()
     return #saleItems > 0
 end
 
-event.gameStateLevel.add("APMarketCrashTrap", { order = "splitScreen" }, function()
-    if currentLevel.isLobby() then
-        apMarketCrashActive = false
-    elseif apMarketCrashActive then
-        closeShops()
-    end
+-- Every floor after the crash opens closed too, until the run ends.
+event.gameStateLevel.add("APMarketCrashTrap", { order = "splitScreen", sequence = 1 }, function()
+    if currentLevel.isLobby() then return end
+    if trapSystem.isActive("MarketCrashTrap") then closeShops() end
 end)
 
-TrapHandler.register("MarketCrashTrap", makeSimpleTrap({
-    flyawayText = "Market Crash!",
-    setup = function()
-        if apMarketCrashActive then return false end
-    end,
-    after = function()
-        apMarketCrashActive = true
+trapSystem.define({
+    name     = "MarketCrashTrap",
+    flyaway  = "Market Crash!",
+    scope    = trapSystem.Scope.RUN,
+    stateful = true,
+    start    = function()
         closeShops()
+        return true
     end,
-}))
+})

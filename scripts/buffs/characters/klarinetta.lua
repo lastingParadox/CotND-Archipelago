@@ -1,8 +1,14 @@
 local apUtils    = require "AP.scripts.utils.apUtils"
+local itemBan    = require "necro.game.item.ItemBan"
 local itemPickup = require "necro.game.item.ItemPickup"
 local progression = require "AP.scripts.client.progression"
 
 local klarinetta = {}
+
+local ZWEIHANDER_UNBAN = itemBan.Flag.unmask(
+    itemBan.Flag.mask(itemBan.Type.FULL, itemBan.Type.LOCK),
+    itemBan.Flag.LOSS_SCATTER
+)
 
 event.itemGenerate.add("apKlarinettaBuffZweihanderPool", {
     order    = "initPool",
@@ -23,15 +29,14 @@ event.itemGenerate.add("apKlarinettaBuffZweihanderPool", {
     end
 end)
 
--- getBanFlags caches per (holder, item) at level-gen time before progression data
--- is available, so a buff check here would always evaluate false and stick.
+
 event.itemBanCheck.add("apKlarinettaBuffZweihanderUnban", {
     order    = "unbanComponent",
     sequence = 1,
 }, function(ev)
     if ev.holder.name ~= "Sync_Klarinetta" then return end
     if not ev.item.Sync_weaponCollisionCheck then return end
-    ev.mask = 0
+    ev.mask = itemBan.Flag.unmask(ev.mask, ZWEIHANDER_UNBAN)
 end)
 
 event.objectTryCollectItem.add("apKlarinettaBuffPickupCheck", {
@@ -42,10 +47,7 @@ event.objectTryCollectItem.add("apKlarinettaBuffPickupCheck", {
     if ev.entity.name ~= "Sync_Klarinetta" then return end
     if ev.result == itemPickup.Result.NONE then return end
 
-    local isZweihander = ev.item.Sync_weaponCollisionCheck ~= nil
-    local isScroll = ev.item.AP_klarinettaWeaponScroll ~= nil
-
-    if not (isZweihander or isScroll) then return end
+    if not ev.item.AP_klarinettaWeaponScroll then return end
 
     if not progression.getCharacterBuff("Klarinetta") then
         ev.result = itemPickup.Result.NONE

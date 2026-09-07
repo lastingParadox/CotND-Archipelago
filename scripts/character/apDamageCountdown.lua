@@ -103,3 +103,53 @@ event.gameStateLevel.add("apRemoveDamageCountdown", "damageCountdown", function(
 end)
 
 
+
+event.entitySchemaLoadEntity.add("apDamageCountdownOnControllable", { order = "overrides", sequence = 2 },
+    function(ev)
+        if ev.entity.controllable then
+            ev.entity.AP_damageCountdown = ev.entity.AP_damageCountdown or {}
+        end
+    end)
+
+local carried = {}
+
+event.objectControllerChanged.add("apCarryDamageCountdown", { order = "player", sequence = -1 },
+    function(ev)
+        local countdown = ev.entity.AP_damageCountdown
+
+        -- Arriving in a new body: pick the countdown back up.
+        if ev.playerID then
+            local saved = carried[ev.playerID]
+
+            if saved and countdown then
+                countdown.active         = true
+                countdown.countdown      = saved.countdown
+                countdown.countdownReset = saved.countdownReset
+                countdown.damage         = saved.damage
+                countdown.killerName     = saved.killerName
+                countdown.type           = saved.type
+            end
+
+            carried[ev.playerID] = nil
+            return
+        end
+
+        local playerID = ev.entity.controllable and ev.entity.controllable.playerID
+
+        if not (playerID and playerID ~= 0 and countdown and countdown.active) then return end
+
+        carried[playerID] = {
+            countdown      = countdown.countdown,
+            countdownReset = countdown.countdownReset,
+            damage         = countdown.damage,
+            killerName     = countdown.killerName,
+            type           = countdown.type,
+        }
+
+        countdown.active = false
+    end)
+
+-- Dropped with the countdowns themselves, at the end of the floor they were owed on.
+event.gameStateLevel.add("apClearCarriedDamageCountdown", "damageCountdown", function()
+    carried = {}
+end)

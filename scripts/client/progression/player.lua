@@ -6,8 +6,7 @@ local apFlags = require("AP.scripts.utils.flags")
 local apLog = require("AP.scripts.utils.log").apLog
 local apStorage = require("AP.scripts.client.storage")
 
--- PriceTag checks affordability against the buyer's own currency, so the balance
--- has to sit on every player entity rather than just whoever is first in the list.
+-- The balance sits on every player entity, since PriceTag checks the buyer's own currency.
 local function syncDiamondCurrency()
     local amount = apStorage.saveData.diamonds or 0
     currency.setShared(apFlags.CURRENCY_AP_DIAMOND, amount)

@@ -1,30 +1,29 @@
 local damage        = require("necro.game.system.Damage")
 local invincibility = require("necro.game.character.Invincibility")
-local player        = require("necro.game.character.Player")
 
-local APFlags        = require "AP.scripts.utils.flags"
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local APFlags    = require "AP.scripts.utils.flags"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local function isProtected(entity)
     if entity.spawnInvincibility and entity.spawnInvincibility.active then return true end
     return invincibility.isActive(entity)
 end
 
-TrapHandler.register("DamageTrap", makeSimpleTrap({
-    flyawayText = "Ouch!",
+trapSystem.define({
+    name    = "DamageTrap",
+    flyaway = "Ouch!",
     -- Defer the whole trap rather than hitting only the unprotected players.
-    setup = function()
-        for _, entity in ipairs(player.getPlayerEntities()) do
-            if entity.playableCharacter and isProtected(entity) then return false end
+    guard   = function(ctx)
+        for _, entry in ipairs(ctx.players) do
+            if isProtected(entry.entity) then return false end
         end
     end,
-    action = function(entity)
+    apply   = function(ctx)
         damage.inflict({
-            victim     = entity,
+            victim     = ctx.entity,
             damage     = 1,
             type       = APFlags.DAMAGE_AP_TRAP,
             killerName = "Damage Trap",
         })
     end,
-}))
+})

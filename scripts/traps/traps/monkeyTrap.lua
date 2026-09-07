@@ -1,12 +1,10 @@
 local affectorItem = require("necro.game.item.AffectorItem")
-local character    = require "necro.game.character.Character"
 local collision    = require "necro.game.tile.Collision"
 local ecs          = require "system.game.Entities"
 local rng          = require "necro.game.system.RNG"
 local targeting    = require "necro.game.enemy.Targeting"
 
 local makeSummonTrap = (require "AP.scripts.traps.factories.makeSummonTrap").makeSummonTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
 
 local function getMonkeyVariants()
     local entities = ecs.getEntityTypesWithComponents({ "monkeyLike", "grab" })
@@ -19,7 +17,8 @@ local function getMonkeyVariants()
     return result
 end
 
-TrapHandler.register("MonkeyTrap", makeSummonTrap({
+makeSummonTrap({
+    name         = "MonkeyTrap",
     flyawayText  = "Have a Monkey!",
     min          = 1,
     max          = 1,
@@ -74,8 +73,8 @@ TrapHandler.register("MonkeyTrap", makeSummonTrap({
         end
         return { variants = monkeys, flyawayText = "Have a Monkey!" }
     end,
-    onSpawn = function(monkey, t, playerEntity)
+    onSpawn = function(monkey, _tile, playerEntity)
         targeting.setTarget(monkey, playerEntity)
         playerEntity.character.canAct = false
     end,
-}))
+})

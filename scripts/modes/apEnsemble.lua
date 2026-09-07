@@ -3,8 +3,7 @@ local enum = require("system.utils.Enum")
 local gameSession = require("necro.client.GameSession")
 local multiCharacter = require("necro.game.data.modifier.MultiCharacter")
 
--- apCharacters and progression are lazy-required to avoid a cyclic dependency:
--- they pull in apStorage/settings during module load before the mod loader finishes.
+-- apCharacters and progression are lazy-required to avoid a load-time cyclic dependency.
 
 gameSession.Mode.extend(
     "APEnsemble",
@@ -31,8 +30,7 @@ gameSession.Mode.extend(
     })
 )
 
--- IMPORTANT: never call multiCharacter.getCharacterList() inside the characters function —
--- getCharacterList() resolves to getChoosableCharacters(this mode), causing infinite recursion.
+-- Never call multiCharacter.getCharacterList() in here; it recurses back into this function.
 multiCharacter.Mode.extend("AP_ENSEMBLE", enum.data({
     ensemble = true,
     defaultCharacter = "Cadence",
@@ -41,16 +39,12 @@ multiCharacter.Mode.extend("AP_ENSEMBLE", enum.data({
     characters = function()
         local apCharacters = require("AP.scripts.utils.apCharacters")
         local progression = require("AP.scripts.client.progression")
-        local unlockedAP = progression.getCharacters()
         local result = {}
 
-        for charName, unlocked in pairs(unlockedAP) do
-            if unlocked then
-                local cotndName = apCharacters.apLocationToCotNDChar(charName)
-                if ecs.typeHasComponent(cotndName, "controllable")
-                    and apCharacters.isCharacterPlayable(cotndName) then
-                    table.insert(result, cotndName)
-                end
+        for _, charName in ipairs(progression.getPlayableCharacters()) do
+            local cotndName = apCharacters.apLocationToCotNDChar(charName)
+            if ecs.typeHasComponent(cotndName, "controllable") then
+                table.insert(result, cotndName)
             end
         end
 

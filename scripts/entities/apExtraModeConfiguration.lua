@@ -1,4 +1,3 @@
-local components = require "necro.game.data.Components"
 local currentLevel = require "necro.game.level.CurrentLevel"
 local customEntities = require "necro.game.data.CustomEntities"
 local ecs = require("system.game.Entities")
@@ -6,6 +5,8 @@ local extraMode = require "necro.game.data.modifier.ExtraMode"
 local flyaway = require "necro.game.system.Flyaway"
 local focus = require "necro.game.character.Focus"
 local lobbyEffects = require "necro.render.level.LobbyEffects"
+local settings = require "necro.config.Settings"
+local settingsStorage = require "necro.config.SettingsStorage"
 local sound = require "necro.audio.Sound"
 local trapClientTrigger = require "necro.game.trap.TrapClientTrigger"
 local worldLabel = require "necro.game.system.WorldLabel"
@@ -14,6 +15,8 @@ local apPreview = require("AP.scripts.utils.apPreview")
 
 local apClient = require("AP.scripts.client.client")
 local progression = require("AP.scripts.client.progression")
+
+local apExtraModeConfiguration = {}
 
 local hasPendingRunStart = false
 
@@ -105,6 +108,22 @@ local function isExtraModeDisabled(mode)
     return progression.getExtraModes() and getModeSaveDataById(mode) == nil
 end
 
+function apExtraModeConfiguration.disableLockedModes()
+    if not apClient.isHost() then return end
+
+    for _, mode in ipairs(extraMode.listAvailableModes()) do
+        if extraMode.isActive(mode) and isExtraModeLocked(mode) then
+            extraMode.setActive(mode, false)
+
+            -- setActive only writes REMOTE_PENDING, which isActive cannot read until it round-trips.
+            local key = extraMode.Type.data[mode].key
+            if key then
+                settingsStorage.set(key, nil, settings.Layer.REMOTE_OVERRIDE)
+            end
+        end
+    end
+end
+
 local function tryToggleAPExtraMode(playerEntity, modeEntity, explosive)
     local modeID = modeEntity.interactableToggleExtraMode.extraModeID
 
@@ -188,7 +207,9 @@ event.objectGetHUDEquipment.override("showExtraModes", { sequence = 1 }, functio
             "interactableToggleExtraModeSpriteChange"
         }) do
             -- TODO: Find out a way to have an item come from AP_interactable when activated and not the vanilla shrine
-            if entity.interactableToggleExtraMode.active and not entity.AP_interactable.ap then
+            -- Read live: the entity's cached active flag only refreshes while the shrine is on screen.
+            if extraMode.isActive(entity.interactableToggleExtraMode.extraModeID)
+                and not entity.AP_interactable.ap then
                 ev.slots.misc = ev.slots.misc or {}
 
                 table.insert(ev.slots.misc, entity)
@@ -196,3 +217,5 @@ event.objectGetHUDEquipment.override("showExtraModes", { sequence = 1 }, functio
         end
     end
 end)
+
+return apExtraModeConfiguration

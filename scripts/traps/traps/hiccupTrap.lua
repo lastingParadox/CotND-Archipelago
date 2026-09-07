@@ -2,9 +2,8 @@ local action    = require "necro.game.system.Action"
 local collision = require "necro.game.tile.Collision"
 local rng       = require "necro.game.system.RNG"
 
-local apFlyaways        = require "AP.scripts.ui.apFlyaways"
-local makeBeatStateTrap = (require "AP.scripts.traps.factories.makeBeatStateTrap").makeBeatStateTrap
-local TrapHandler       = require "AP.scripts.traps.trapHandler"
+local apFlyaways = require "AP.scripts.ui.apFlyaways"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local ORTHOGONAL = {
     action.Direction.RIGHT,
@@ -13,34 +12,37 @@ local ORTHOGONAL = {
     action.Direction.DOWN,
 }
 
-TrapHandler.register("HiccupTrap", makeBeatStateTrap({
-    name        = "HiccupTrap",
-    flyawayText = "Hiccup!",
-    statusText  = "Hiccups!",
+local MIN_INTERVAL = 5
+local MAX_INTERVAL = 10
 
-    initState = function(entity, channel)
-        return { beatsUntilHiccup = rng.range(5, 10, channel) }
+trapSystem.define({
+    name      = "HiccupTrap",
+    flyaway   = "Hiccup!",
+    status    = "Hiccups!",
+    perPlayer = true,
+    -- No duration: the hiccups last until the floor does.
+    apply     = function(ctx)
+        ctx.state.beatsUntilHiccup = rng.range(MIN_INTERVAL, MAX_INTERVAL, ctx.channel)
     end,
+    tick      = function(ctx)
+        local entity = ctx.entity
 
-    onTick = function(entity, entityState, stateTable, ev, channel)
-        entityState.beatsUntilHiccup = entityState.beatsUntilHiccup - 1
-        if entityState.beatsUntilHiccup > 0 then return end
+        ctx.state.beatsUntilHiccup = ctx.state.beatsUntilHiccup - 1
+        if ctx.state.beatsUntilHiccup > 0 then return end
 
-        local x     = entity.position.x
-        local y     = entity.position.y
+        local x, y  = entity.position.x, entity.position.y
         local free  = {}
         for _, dir in ipairs(ORTHOGONAL) do
-            local dx = action.dx(dir)
-            local dy = action.dy(dir)
-            if not collision.check(x + dx, y + dy, collision.Group.SOLID) then
+            if not collision.check(x + action.dx(dir), y + action.dy(dir), collision.Group.SOLID) then
                 free[#free + 1] = dir
             end
         end
 
         if #free > 0 then
-            local chosenDir = rng.choice(free, channel)
+            local chosenDir = rng.choice(free, ctx.channel)
             local found = false
-            for _, entry in ipairs(ev.actionQueue) do
+
+            for _, entry in ipairs(ctx.ev.actionQueue) do
                 if entry.entity and entry.entity.id == entity.id then
                     entry.action = chosenDir
                     found = true
@@ -48,12 +50,12 @@ TrapHandler.register("HiccupTrap", makeBeatStateTrap({
                 end
             end
             if not found then
-                ev.actionQueue[#ev.actionQueue + 1] = { entity = entity, action = chosenDir }
+                ctx.ev.actionQueue[#ctx.ev.actionQueue + 1] = { entity = entity, action = chosenDir }
             end
+
             apFlyaways.addToFlyawayQueue({ entity = entity, text = "Hiccup!" })
         end
 
-        -- Reset the timer for another random interval.
-        entityState.beatsUntilHiccup = rng.range(5, 10, channel)
+        ctx.state.beatsUntilHiccup = rng.range(MIN_INTERVAL, MAX_INTERVAL, ctx.channel)
     end,
-}))
+})

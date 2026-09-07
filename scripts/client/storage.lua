@@ -34,9 +34,7 @@ function apStorage.ensureSaveDataTables()
     end
 end
 
--- Straight away, not just once a session starts: connecting moves the players before the
--- State packet lands, and anything that fires in between -- a level completing, a check
--- being recorded -- reads these tables and would otherwise find nil.
+-- Run at load, so nothing reads these tables as nil before the first State packet lands.
 apStorage.ensureSaveDataTables()
 
 function apStorage.initSession(seedName, playerName, slot)
@@ -48,8 +46,7 @@ function apStorage.initSession(seedName, playerName, slot)
     apStorage.ensureSaveDataTables()
 end
 
--- Non-hosts have no socket of their own; the host's replicated state lands here.
--- A setter because requiring modules hands out a read-only proxy.
+-- Where the host's replicated state lands on a non-host.
 function apStorage.applyHostState(seedName, playerName, slot, saveData)
     apStorage.seedName = seedName
     apStorage.playerName = playerName

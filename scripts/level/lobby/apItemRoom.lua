@@ -33,8 +33,7 @@ local PITCH = 2
 
 local HUB_CENTER_DX = math.floor(HUB_WIDTH / 2)
 
--- Slot offsets for `count` stairs spaced by PITCH, centred on the hub. A row
--- holds fewer than its capacity whenever the slot's options empty a category.
+-- Slot offsets for `count` stairs spaced by PITCH, centred on the hub.
 local function centeredColumns(count)
     local columns = {}
 
@@ -46,8 +45,7 @@ local function centeredColumns(count)
 end
 
 local function chamberLayout(count)
-    -- Squarest grid that holds them, so a category does not stretch into one
-    -- long row.
+    -- Squarest grid that holds them, so a category does not stretch into one long row.
     local cols = math.min(CHAMBER_COLUMNS, math.ceil(math.sqrt(count)))
     local rows = math.ceil(count / cols)
 
@@ -59,20 +57,11 @@ local function chamberLayout(count)
     }
 end
 
--- segment.add grows the level to fit each new room, and every growth fires
--- mapSizeChange, which reallocates and copies ten full-map arrays (tileMap, vision,
--- light, minimap, objectMap, collision...). Adding the hub and 18 chambers one at a
--- time therefore recopies a map that is still growing, 19 times over.
---
--- ensureLevelContainsSegment unions the new segment against the level rect and
--- setLevelBounds early-returns when nothing changed, so claiming the whole footprint
--- up front collapses all of that into a single resize. Purely how many times the map
--- is rebuilt; the rooms land exactly where they did before.
+-- Claims the whole footprint up front, collapsing one map resize per room into a single one.
 local function reserveLevelSpace(chamberLayouts)
     local lastX, _, lastWidth = segment.getBounds(segment.getCount())
 
-    -- Mirrors addRoom's own placement: each room starts one tile past the previous
-    -- segment's right edge, and writes one row below its floor.
+    -- Mirrors addRoom's placement: one tile past the previous segment, one row below its floor.
     local right = lastX + lastWidth
     local bottom = HUB_MIN_Y + HUB_HEIGHT
     right = right + 1 + HUB_WIDTH
@@ -142,8 +131,7 @@ function apItemRoom.generateItemRoom(x, y)
         end
     end
 
-    -- How many stairs each game row ends up holding, so the pillars flanking the
-    -- last row can hug it however many categories the slot leaves.
+    -- How many stairs each game row ends up holding, for the pillars flanking the last row.
     local rowCounts = {}
     local assigned = 0
     for index, row in ipairs(GAME_ROWS) do
@@ -151,8 +139,7 @@ function apItemRoom.generateItemRoom(x, y)
         assigned = assigned + rowCounts[index]
     end
 
-    -- The groups that end up with a stair, in the order their chambers get built, so
-    -- the reserved footprint covers exactly the rooms that follow.
+    -- The groups that end up with a stair, in the order their chambers get built.
     local chamberGroups = {}
     local assignedGame = 0
     for index in ipairs(GAME_ROWS) do
@@ -191,8 +178,7 @@ function apItemRoom.generateItemRoom(x, y)
 
     local wall = tileTypes.lookUpTileID("UnbreakableWall", tileTypes.lookUpZoneID("Zone2"))
 
-    -- One pitch outside each end of the last row, so they bookend it rather than
-    -- sitting at a width the row may no longer be.
+    -- One pitch outside each end of the last row, so they bookend whatever width it is.
     local pillarRow = GAME_ROWS[#GAME_ROWS]
     local pillarColumns = centeredColumns(rowCounts[#GAME_ROWS])
 

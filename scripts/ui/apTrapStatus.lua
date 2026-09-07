@@ -14,11 +14,7 @@ local DEFAULT_COLOR = color.trapStatus
 local providers = {}
 local sortedIds = {}
 
----Registers a persistent status indicator for a trap effect. The provider is
----polled every render frame per player: return the indicator text (and an
----optional color) while the effect is active on that player, or nil while it
----is not. Polling the trap's own state keeps the indicator in sync with the
----effect without any set/clear bookkeeping.
+---Registers a status indicator, polled per player each render frame for text, color or nil.
 function apTrapStatus.register(id, provider)
     providers[id] = provider
     sortedIds = {}

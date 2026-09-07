@@ -111,8 +111,7 @@ local function applyState(data)
         saveData.extraModes         = seededModes
         saveData.characterBlacklist = arrayToTable(data.character_blacklist, true)
         saveData.characterUnlocks   = data.character_unlocks or "item_only"
-        -- Resolved by the apworld, which is the only side that knows what this slot's DLC
-        -- actually put in the pool.
+        -- Resolved by the apworld, which knows what this slot's DLC put in the pool.
         saveData.characterRequirements = data.character_requirements or {}
         saveData.includeUniqueItems = isEnabled(data.include_unique_items)
         saveData.shrineChecks       = isEnabled(data.include_shrine_checks)
@@ -139,8 +138,7 @@ local function applyState(data)
     apStorage.ensureSaveDataTables()
     progression.rebuildCaches()
 
-    -- Recompute from the received-items log so goldenLuteShards is correct
-    -- before apConnect fires, even when reconnecting without restarting the game.
+    -- Recomputed from the received-items log so the count is correct before apConnect fires.
     local shardCount = 0
     for _, entry in pairs(apStorage.saveData.receivedItems) do
         if entry.item == "APGoldenLuteShard" then
@@ -159,18 +157,20 @@ local function applyState(data)
 end
 
 handlers.register("State", function(message, ctx)
-    if message.world_version then
-        ctx.apworldVersion = message.world_version
+    local worldVersion = message.world_version
+    ctx.apworldVersion = worldVersion or false
 
-        if not apVersion.isApworldCompatible(message.world_version) then
-            local text = ("Archipelago apworld (v%s) is too old for this mod\n(v%s, requires apworld v%s+). Ask your host to update the apworld,\nor downgrade the AP Redux mod to a matching version, then reconnect.")
-                :format(message.world_version, apVersion.getModVersion(), apVersion.MIN_APWORLD_VERSION)
-            apLog(text, "error")
-            ctx.lastConnectError = text
-            ctx.disconnect(("Apworld too outdated (v%s, mod requires apworld v%s+)."):format(message.world_version, apVersion.MIN_APWORLD_VERSION))
-            return
-        end
+    -- An apworld too old to send a version at all reports nil, which is still too old.
+    if not apVersion.isApworldCompatible(worldVersion) then
+        local reported = type(worldVersion) == "string" and worldVersion ~= "" and worldVersion or "unknown"
+        local text = ("Archipelago apworld (v%s) is too old for this mod\n(v%s, requires apworld v%s+). Ask your host to update the apworld,\nor downgrade the AP Redux mod to a matching version, then reconnect.")
+            :format(reported, apVersion.getModVersion(), apVersion.MIN_APWORLD_VERSION)
+        apLog(text, "error")
+        ctx.lastConnectError = text
+        ctx.disconnect(("Apworld too outdated (v%s, mod requires apworld v%s+)."):format(reported, apVersion.MIN_APWORLD_VERSION))
+        return
     end
+
     applyState(message)
 
     if not apUtils.isNetworked() then

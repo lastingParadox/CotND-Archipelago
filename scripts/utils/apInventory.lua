@@ -92,8 +92,7 @@ end
 local function isAlwaysAllowedHeldItem(itemEntity)
     if not itemEntity then return false end
 
-    -- Bomb inventory can be represented by different bomb item entity names.
-    -- Preserve the entire bomb slot in lobby sanitization.
+    -- Preserves the whole bomb slot, which several entity names can occupy.
     if itemEntity.itemSlot and (itemEntity.itemSlot.name == "bomb" or itemEntity.itemSlot.name == "bombs") then
         return true
     end
@@ -159,17 +158,14 @@ end
 
 function apInventory.isAllowedItem(entity, itemType, progression)
     return progression.getItems(itemType)
-        -- Diamond Dealer purchases count as starting inventory until a run
-        -- consumes them, so lobby sanitization must not delete them.
+        -- Diamond Dealer purchases count as starting inventory until a run consumes them.
         or progression.getNextRunItems(itemType)
         or isUniqueStarterAllowed(entity, itemType, progression)
         or isInnateStarterAllowed(entity, itemType)
         or isCoinUpgradeAllowed(itemType, progression)
 end
 
--- Equips every Diamond Dealer nextRunItem this character can use. Called last in
--- applyStarterInventory (and on purchase) so a bought weapon/armor overrides the
--- character's default starter. Items the character can't pick up are skipped.
+-- Equips every Diamond Dealer nextRunItem this character can use, skipping the rest.
 function apInventory.equipNextRunItems(entity, progression)
     if not entity then return end
     for itemType in pairs(progression.getNextRunItems()) do
@@ -362,9 +358,7 @@ function apInventory.applyStarterInventory(entity, progression, options)
 
     apInventory.ensureShovel(entity)
 
-    -- In the lobby, Diamond Dealer purchases are part of the starting inventory
-    -- until a run consumes them; equip them last so they win over the default
-    -- starters. In a run this is skipped: grantNextRunItems grants and consumes.
+    -- Equipped last in the lobby so purchases win over default starters; skipped in a run.
     if currentLevel.isLobby() then
         apInventory.equipNextRunItems(entity, progression)
     end

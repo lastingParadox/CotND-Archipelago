@@ -2,7 +2,6 @@ local extraMode = require "necro.game.data.modifier.ExtraMode"
 local gfx = require "system.gfx.GFX"
 local marker = require "necro.game.tile.Marker"
 local object = require("necro.game.object.Object")
-local tile = require("necro.game.tile.Tile")
 
 local apGameModeSelect = {}
 local lobbyUtils = require("AP.scripts.utils.lobbyUtils")
@@ -93,8 +92,7 @@ function apGameModeSelect.generateExtraModesRoom(originX, lobbyY)
     object.spawn("AP_ZonesStairLabel", centerX + 4, -1)
     object.spawn("AP_TriggerAPTrap", centerX + 4, -1)
 
-    -- The top one carries the opening blurb, as the vanilla room does; the bottom one
-    -- stays hidden until a shrine nearer to it is touched.
+    -- The top label carries the opening blurb; the bottom stays hidden until a shrine is near.
     object.spawn("AP_LabelExtraModeInfo", centerX, -1, {
         worldLabel = {
             alignY = 0

@@ -1,7 +1,8 @@
-local makeFloorTrap = (require "AP.scripts.traps.factories.makeFloorTrap").makeFloorTrap
-local TrapHandler   = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
-TrapHandler.register("TarTrap", makeFloorTrap({
-    flyawayText = "Tar Floor!",
-    tileType    = "Tar",
-}))
+trapSystem.define({
+    name    = "TarTrap",
+    flyaway = "Tar Floor!",
+    voice   = "voiceConfused",
+    floor   = { tileType = "Tar" },
+})

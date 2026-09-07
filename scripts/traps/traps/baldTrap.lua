@@ -4,14 +4,12 @@ local player = require("necro.game.character.Player")
 local hasSkins, SkinReaction = pcall(require, "CharacterSkins.SkinReaction")
 local _, SkinStorage         = pcall(require, "CharacterSkins.SkinStorage")
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local BALD_TEXTURE_PREFIX = "mods/AP/gfx/entities/bald/bald_heads"
 local BALD_TEXTURE_FALLBACK = BALD_TEXTURE_PREFIX .. ".png"
 
--- Sprites are named after the character, so which ones exist is the only question and
--- the file itself answers it. Cached: this runs per head on every spawn.
+-- Cached per suffix, since this resolves once per head on every spawn.
 local baldTextures = {}
 
 local function baldTexture(suffix)
@@ -30,11 +28,6 @@ local baldTrapExceptions = {
     Sync_Chaunter = true,
     Goldman_Goldman = true
 }
-
-local isBald = false
-isBald = script.persist(function()
-    return isBald
-end)
 
 local function getHeadEntity(playerEntity)
     if not playerEntity.characterWithAttachment then return nil end
@@ -84,14 +77,14 @@ end
 event.objectSpawn.add("APBaldTrapApplyOnSpawn",
     { order = "sprite", sequence = 1, filter = "characterWithAttachment" },
     function(ev)
-        if isBald then
+        if trapSystem.isActive("BaldTrap") then
             applyBaldToEntity(ev.entity)
         end
     end
 )
 
 local function onReactionChange(ev)
-    if isBald then applyBaldToEntity(ev.entity) end
+    if trapSystem.isActive("BaldTrap") then applyBaldToEntity(ev.entity) end
 end
 
 event.objectTakeDamage.add("APBaldTrapReaction",
@@ -107,27 +100,23 @@ event.objectGrooveChain.add("APBaldTrapReaction",
     onReactionChange
 )
 
--- Clear the trap when the run resets.
-event.gameStateReset.add("APBaldTrapClearOnReset", { order = "resetRunVariables" }, function()
-    isBald = false
-end)
+trapSystem.define({
+    name     = "BaldTrap",
+    flyaway  = function(ctx)
+        return baldTrapExceptions[ctx.entity.name] and "Bald Trap negated!" or "Bald!"
+    end,
+    -- Head sprites for the rest of the run, and nothing the simulation reads.
+    scope    = trapSystem.Scope.RUN,
+    storage  = trapSystem.Storage.VOLATILE,
+    stateful = true,
+    apply    = function(ctx)
+        if baldTrapExceptions[ctx.entity.name] then return end
 
-TrapHandler.register("BaldTrap", makeSimpleTrap({
-    flyawayText = function(entity)
-        return baldTrapExceptions[entity.name] and "Bald Trap negated!" or "Bald!"
+        applyBaldToEntity(ctx.entity)
+        ctx.state.anyBald = true
     end,
-    setup = function()
-        if isBald then return false end
-        return { anyBald = false }
+    -- Ends the trap unless somebody actually went bald.
+    finish   = function(ctx)
+        if not ctx.state.anyBald then trapSystem.stop("BaldTrap") end
     end,
-    action = function(entity, ctx)
-        if not baldTrapExceptions[entity.name] then
-            applyBaldToEntity(entity)
-            ctx.anyBald = true
-        end
-    end,
-    after = function(ctx)
-        isBald = ctx.anyBald
-    end,
-    alwaysSucceed = true,
-}))
+})

@@ -3,8 +3,7 @@ local levelSequence = require("necro.game.level.LevelSequence")
 local apStorage = require("AP.scripts.client.storage")
 
 local function attach(progression)
-    -- The zone list a run will actually use. Zone 5 goes by the slot's Amplified
-    -- setting rather than whether the DLC happens to be loaded.
+    -- The zone list a run will use, with zone 5 gated on the slot's Amplified setting.
     function progression.getZoneList()
         local lastZone = progression.isDLCEnabled("Amplified") and 5 or 4
         local zones = {}
@@ -19,8 +18,7 @@ local function attach(progression)
     end
 
     ---Zones an AP Zones run may visit, in play order.
-    ---@param zoneList table|nil Defaults to the full list; pass the sequence's own
-    ---when it may have been reordered by a character trait.
+    ---@param zoneList table|nil Defaults to the full list; pass the sequence's own if reordered.
     function progression.getAccessibleZones(zoneList)
         zoneList = zoneList or progression.getZoneList()
 
@@ -72,8 +70,7 @@ local function attach(progression)
         return access[tostring(zone)] == true
     end
 
-    -- Every copy counts, precollected included, so zone 1 is the base rather than
-    -- the starting zone. Python's zone_access push uses the same accounting.
+    -- Every copy counts, precollected included, so zone 1 is the base.
     function progression.addProgressiveZoneAccess()
         local access = apStorage.saveData.zoneAccess
         if not access then

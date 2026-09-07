@@ -26,8 +26,7 @@ flyawayTimer, flyawayCounter = script.persist(function()
     return flyawayTimer, flyawayCounter
 end)
 
--- A Dig NPC's golden key lands on the NPC's own floor, a Glass NPC's glass key one
--- floor ahead of it.
+-- A Dig NPC's golden key lands on its own floor, a Glass NPC's glass key one floor ahead.
 local function keysForFloor(zone, floor)
     local owed = {}
 
@@ -47,8 +46,7 @@ local function keysForFloor(zone, floor)
     return owed
 end
 
--- Not levelGen.placeObject: its fallback deletes whichever entity is first on a
--- random tile and spawns there anyway, which put a cage on top of a chest.
+-- Not levelGen.placeObject, whose fallback deletes whatever already stands on the tile.
 local function placeInStandardRoom(entityType, attributes, channel)
     local tiles = {}
 
@@ -64,8 +62,7 @@ local function placeInStandardRoom(entityType, attributes, channel)
     return object.spawn(entityType, coord[1], coord[2], attributes)
 end
 
--- The generator only reserves an NPC_KEY spot while the vanilla save has that NPC
--- locked, which an AP run never does, so there is nothing to inherit.
+-- The generator reserves no NPC_KEY spot in an AP run, so there is nothing to inherit.
 local function queueKey(keyType, channel)
     apExtrasRoom.add(keyType, {}, {
         secret = true,

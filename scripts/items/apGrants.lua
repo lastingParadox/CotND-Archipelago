@@ -58,10 +58,7 @@ end
 
 local radialOffsets = generateRadialOffsets(20)
 
----Lays an item at the feet of everyone in the run, which is how AP delivers anything it
----cannot hand over directly. The search fans out from the tile below each player, so a
----drop in a crowded room still lands somewhere reachable. The player who already carried
----this one off a chest is skipped: they have it.
+---Lays an item at the feet of everyone in the run, skipping whoever already carried it off.
 ---@param ctx table|nil The grant context; omitted when replaying from the queue.
 ---@return boolean spawned Whether it landed for anyone.
 function apGrants.drop(itemType, ctx)
@@ -92,10 +89,7 @@ function apGrants.drop(itemType, ctx)
     return spawned
 end
 
----Declares a filler that is really an ordinary CotND item. In a run it is laid out like
----any other item, skipping whoever already carried it off the location in person; with no
----run to lay it into -- bought from the lobby shop -- it waits in the queue for the start
----of the next one, since nothing on the Python side replays a filler the mod was sent.
+---Declares a filler that is really an ordinary CotND item, queued when there is no run.
 ---@param apItemId string The AP item id, e.g. "APBomb".
 ---@param itemType string The entity it really is, e.g. "Bomb".
 function apGrants.defineItemFiller(apItemId, itemType)
@@ -146,8 +140,7 @@ function apGrants.resolve(itemId)
     return fallback
 end
 
--- A carrier standing on an AP location has a grant following it, so applying it here has
--- to be recorded; one that does not -- diamonds dug out of a wall -- simply applies.
+-- A carrier on an AP location records its pickup; one without a location simply applies.
 local function locationCode(item)
     local tag = item.AP_locationItem
     local code = tag and tag.locationCode
@@ -155,8 +148,7 @@ local function locationCode(item)
     return code ~= nil and code ~= "" and code or nil
 end
 
--- Ahead of "priceTag" itself: a carrier that refuses to be taken must do so before the
--- player is charged for it.
+-- Ahead of "priceTag", so a carrier can refuse before the player is charged.
 event.objectTryCollectItem.add("apGateGrantPickup", { order = "priceTag", sequence = -100 }, function(ev)
     local spec = byCarrier[ev.item.name]
     if not (spec and spec.gate) then return end
@@ -170,19 +162,17 @@ event.objectTryCollectItem.add("apGateGrantPickup", { order = "priceTag", sequen
     ev.result = itemPickup.Result.FAILURE
 end)
 
--- Ahead of the carrier's own removal at this same order, and after "priceTag", so a shop
--- copy the player could not afford has already been failed.
+-- Ahead of the carrier's removal at this order and after "priceTag" has failed unaffordables.
 event.objectTryCollectItem.add("apApplyGrantOnPickup", { order = "priceTag", sequence = 1 }, function(ev)
     if not apUtils.isAPContext(ev.entity) then return end
     if ev.result ~= itemPickup.Result.SUCCESS then return end
 
     local spec = byCarrier[ev.item.name]
-    if not spec then return end
+    if not (spec and spec.apply) then return end
 
     local code = locationCode(ev.item)
 
-    -- Every chest of a kind offers the same location until one is opened, so two players
-    -- can carry off the same item on the same turn.
+    -- Every chest of a kind offers the same location until one is opened.
     if code and progression.isLocationConsumed(code) then return end
 
     if not apReplay.firstThisTurn("grant:" .. ev.item.id) then return end

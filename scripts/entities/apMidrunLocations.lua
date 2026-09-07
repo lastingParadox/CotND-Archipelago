@@ -98,8 +98,7 @@ local function transferPriceTag(from, to)
     return true
 end
 
--- An arena rune and a choice shrine both mark their offers with their own entity ID, which
--- is what starts the fight and clears the offers not taken.
+-- Arena runes and choice shrines both mark their offers with their own entity ID.
 local function transferSingleChoice(from, to)
     local choice = from.item.singleChoice
     if choice == 0 or not to.item then return end
@@ -113,9 +112,7 @@ local function byPosition(a, b)
     return a.position.x < b.position.x
 end
 
--- object.delete only flags the entity; it stays enumerable until the next flush. Shop
--- wares are spawned and then deleted in the same breath when the shopkeeper is already
--- dead, and "initialItems" does that before this runs, so the dying ones are still here.
+-- object.delete only flags an entity, so wares deleted at "initialItems" are still enumerable.
 local function isLive(entity)
     return not entity.gameObject.despawned
 end
@@ -206,9 +203,7 @@ event.levelLoad.add("apLoadMidrunLocations", { order = "extraEntities", sequence
     end
 end)
 
---------------------------------------------------------------------------------
 -- Upgrade chests
---------------------------------------------------------------------------------
 
 local function spawnUpgradeChest(upgrade, anchor, channel)
     apExtrasRoom.add(upgrade.chest, nil, {

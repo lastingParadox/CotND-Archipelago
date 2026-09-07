@@ -8,17 +8,9 @@ local rng    = require "necro.game.system.RNG"
 local freezeFrame = require "necro.render.FreezeFrame"
 local gameState   = require "necro.client.GameState"
 
-local makeCameraTrap = (require "AP.scripts.traps.factories.makeCameraTrap").makeCameraTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local ANGLE_LIST = { 45, 135, 225, 315 }
-
-local trapTimestamp = 0
-local isoEntityIDs  = {}
-local cameraAngle   = 45
-isoEntityIDs, trapTimestamp, cameraAngle = script.persist(function()
-    return isoEntityIDs, trapTimestamp, cameraAngle
-end)
 
 local function rotateCamera(angleDeg)
     local options = render.getCameraOptions(render.Transform.CAMERA).transform
@@ -39,9 +31,7 @@ local function rotateCamera(angleDeg)
     render.setCameraOptions(render.Transform.CAMERA, { transform = options })
 end
 
--- The camera is rotated counter-clockwise by cameraAngle, so movement inputs
--- rotate clockwise by the same amount: a pressed direction then moves toward
--- that on-screen direction, which is a world diagonal (e.g. at 45°, Up → NE).
+-- The camera rotates counter-clockwise by cameraAngle, so inputs rotate clockwise to match.
 local INPUT_ROTATION = {
     [45]  = action.Rotation.CW_45,
     [135] = action.Rotation.CW_135,
@@ -49,19 +39,19 @@ local INPUT_ROTATION = {
     [315] = action.Rotation.CCW_45,
 }
 
--- Runs before facing/attack/dig/move so every downstream handler sees the
--- rotated direction. Movement reads ev.dx/ev.dy (not ev.action), so rotate the
--- delta with the engine's own action.rotate and keep the other fields in sync.
+-- Rotates ev.dx/ev.dy before facing/attack/dig/move, keeping the other fields in sync.
 event.objectDirection.add("APIsometricRotateInput", { order = "storeAction", sequence = -10 }, function(ev)
-    if trapTimestamp == 0 then return end
-    if not (ev.entity.playableCharacter and isoEntityIDs[ev.entity.id]) then return end
-    local rotation = INPUT_ROTATION[cameraAngle]
+    local state = trapSystem.stateOf("IsometricTrap")
+    if not state then return end
+    -- Keyed on the player, not the body, which a bat form or possession swaps out.
+    if not player.isPlayerEntity(ev.entity) then return end
+    if not state.players[ev.entity.controllable.playerID] then return end
+
+    local rotation = INPUT_ROTATION[state.angle]
     if not rotation then return end
 
     if type(ev.direction) == "number" then
-        -- Left/right sprite mirror must follow the pressed (on-screen) direction,
-        -- not the rotated world direction (their horizontal signs disagree at
-        -- 135°/225°). Stash it for the facing override below.
+        -- Stashes the pressed direction, which the sprite mirror follows instead of the world one.
         ev.apIsometricInputDirection = ev.direction
         ev.direction = action.rotateDirection(ev.direction, rotation)
     end
@@ -75,9 +65,7 @@ event.objectDirection.add("APIsometricRotateInput", { order = "storeAction", seq
     end
 end)
 
--- After the vanilla facing handler (which mirrors from the world direction),
--- re-point the visual facing at the on-screen direction so the character faces
--- the way it visibly moves. Gameplay direction stays world-space for aiming.
+-- Re-points visual facing at the on-screen direction after the vanilla facing handler.
 event.objectDirection.add("APIsometricFaceScreen", { order = "facingLate", sequence = 10 }, function(ev)
     local inputDir = ev.apIsometricInputDirection
     if not inputDir or ev.inhibitFacing then return end
@@ -86,44 +74,49 @@ event.objectDirection.add("APIsometricFaceScreen", { order = "facingLate", seque
 end)
 
 event.renderEffects.add("APIsometricCharacterRotate", { order = "spriteCorrection", sequence = 1 }, function()
-    if freezeFrame.isActive() or gameState.isPaused() or trapTimestamp == 0 then return end
+    if freezeFrame.isActive() or gameState.isPaused() then return end
 
-    for entity in ecs.entitiesWithComponents({ "rotatedSprite", "playableCharacter" }) do
-        if isoEntityIDs[entity.id] then
-            -- Constant angle keeps the isometric tilt consistent regardless of
-            -- facing. (Do NOT couple to mirrorX like slideSwayEffect does — that
-            -- is a facing-dependent lean, which flips the tilt when facing left.)
-            entity.rotatedSprite.angle = cameraAngle * math.pi / 180
+    local state = trapSystem.stateOf("IsometricTrap")
+    if not state then return end
+
+    for entity in ecs.entitiesWithComponents({ "rotatedSprite", "controllable" }) do
+        if state.players[entity.controllable.playerID] then
+            -- Constant angle, never coupled to mirrorX, so the tilt does not flip with facing.
+            entity.rotatedSprite.angle = state.angle * math.pi / 180
+            -- Remembered so expiry can straighten a body the player has since left.
+            state.tilted[entity.id] = true
         else
             entity.rotatedSprite.angle = 0
+            state.tilted[entity.id] = nil
         end
     end
 end)
 
-TrapHandler.register("IsometricTrap", makeCameraTrap({
-    name         = "IsometricTrap",
-    duration     = 20,
-    flyawayText  = "Isometric!",
-    voice        = "voiceConfused",
-    sequence     = 3,
-    isActive     = function() return trapTimestamp ~= 0 end,
-    getTimestamp = function() return trapTimestamp end,
-    setTimestamp = function(v) trapTimestamp = v end,
-    applyEffect  = function() rotateCamera(cameraAngle) end,
-    onTrigger    = function(channel)
-        cameraAngle = rng.choice(ANGLE_LIST, channel)
-        for _, entity in ipairs(player.getPlayerEntities()) do
-            if entity and entity.playableCharacter then
-                isoEntityIDs[entity.id] = true
-            end
-        end
+trapSystem.define({
+    name           = "IsometricTrap",
+    flyaway        = "Isometric!",
+    voice          = "voiceConfused",
+    duration       = 20,
+    clock          = trapSystem.Clock.REAL,
+    -- Camera and sprite angles only.
+    storage        = trapSystem.Storage.VOLATILE,
+    renderSequence = 3,
+    start          = function(ctx)
+        ctx.state.angle   = rng.choice(ANGLE_LIST, ctx.channel)
+        ctx.state.players = {}
+        ctx.state.tilted  = {}
     end,
-    onExpire     = function()
-        for _, entity in ipairs(player.getPlayerEntities()) do
-            if isoEntityIDs[entity.id] and entity.rotatedSprite then
+    apply          = function(ctx)
+        if not player.isPlayerEntity(ctx.entity) then return false end
+        ctx.state.players[ctx.entity.controllable.playerID] = true
+    end,
+    render         = function(ctx) rotateCamera(ctx.state.angle) end,
+    expire         = function(ctx)
+        for id in pairs(ctx.state.tilted or {}) do
+            local entity = ecs.getEntityByID(id)
+            if entity and entity.rotatedSprite then
                 entity.rotatedSprite.angle = 0
             end
         end
-        isoEntityIDs = {}
     end,
-}))
+})

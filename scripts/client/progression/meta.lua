@@ -22,14 +22,12 @@ local function attach(progression)
         return apStorage.saveData.goalRequired
     end
 
-    -- Set of floor numbers that are checks, keyed by floor. Resolved by the client
-    -- from Zone Progress Checks, so the spacing rule is never duplicated here.
+    -- Set of floor numbers that are checks, resolved by the client from Zone Progress Checks.
     function progression.getZoneProgressFloors()
         return apStorage.saveData.zoneProgressFloors or { [2] = true }
     end
 
-    -- Minutes an AP Zones Mode run must finish within for this character's All Zones
-    -- check to send. 0 is untimed, which covers saves from before the option existed.
+    -- Minutes this character's All Zones run must finish within; 0 is untimed.
     function progression.getSpeedrunTime(character)
         local times = apStorage.saveData.speedrunTimes or {}
         return times[character] or 0
@@ -52,8 +50,7 @@ local function attach(progression)
         return apStorage.saveData.shrineChecks == true
     end
 
-    -- Ordered {id, category} list of everything this slot can receive, derived by
-    -- the Python client from the apworld's own item pool.
+    -- Ordered {id, category} list of everything this slot can receive.
     function progression.getItemRoom()
         return apStorage.saveData.itemRoom or {}
     end
@@ -112,8 +109,7 @@ local function attach(progression)
         apStorage.saveData.unlockedBuffItems[charName] = true
     end
 
-    -- Whether the buff item is held. getCharacterBuff answers the different
-    -- question of whether the buff is currently switched on at the shrine.
+    -- Whether the buff item is held, not whether the buff is switched on at the shrine.
     function progression.hasBuffItem(charName)
         local unlocked = apStorage.saveData.unlockedBuffItems or {}
         return unlocked[charName] == true

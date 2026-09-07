@@ -7,8 +7,7 @@ local apLobby = require("AP.scripts.level.apLobby")
 
 local apUtils = {}
 
--- Every client simulates the run in lockstep, so anything that spawns or deletes
--- entities has to be driven by synced state at a synced moment.
+-- Spawning or deleting entities off the network needs no synced delivery; on it, everything does.
 apUtils.isNetworked = function()
     return not singlePlayer.isActive()
 end

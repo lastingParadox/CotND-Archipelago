@@ -8,8 +8,7 @@ local function byName(a, b)
     return a.name < b.name
 end
 
--- Splits the tagged prototypes into the two tabs and claims them in ev.set, which
--- is what stops the built-in categories from also listing them.
+-- Splits the tagged prototypes into two tabs and claims them in ev.set.
 local function collectTagged(set)
     local items, objects = {}, {}
 
@@ -31,8 +30,7 @@ local function collectTagged(set)
 end
 
 if hasNecroEdit then
-    -- Ahead of NecroEdit's own "entities" pass so these are claimed before the
-    -- vanilla categories can absorb them; sortResults still places the tabs last.
+    -- Ahead of NecroEdit's own "entities" pass, so the vanilla categories cannot absorb these.
     event.NecroEdit_categoryInit.add("apEditorItems", { order = "entities", sequence = -1 }, function(ev)
         local items, objects = collectTagged(ev.set)
 

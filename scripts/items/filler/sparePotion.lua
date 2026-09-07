@@ -1,14 +1,14 @@
 local apBonusPotion = require("AP.scripts.buffs.apBonusPotion")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
 local trapHandler = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
--- Added to the stack rather than dropped: apBlockExtraPotions refuses every potion pickup
--- in an AP run, so one left on the floor could never be taken.
-trapHandler.register("APSparePotion", makeSimpleTrap({
+-- Added to the stack rather than dropped, since an AP run refuses every potion pickup.
+trapSystem.define({
+    name  = "APSparePotion",
     sound = "pickupGeneral",
-    action = function(entity) apBonusPotion.addPotion(entity) end,
-}))
+    apply = function(ctx) apBonusPotion.addPotion(ctx.entity) end,
+})
 
 apItemFactory.define({
     name = "AP_SparePotion",

@@ -19,8 +19,7 @@ local function attach(progression)
         progression.calculateGoalCompletion(true)
     end
 
-    -- Why the goal is not yet met, phrased for a flyaway, or nil once it is. Shared by
-    -- everything the goal gates so they cannot drift apart on the wording.
+    -- Why the goal is not yet met, phrased for a flyaway, or nil once it is.
     function progression.getGoalUnlockText()
         local completed, goalMet = progression.calculateGoalCompletion(false)
         if goalMet then return nil end

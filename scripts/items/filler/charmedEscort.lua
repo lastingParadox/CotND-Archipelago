@@ -24,7 +24,8 @@ local function localEnemies()
     return names
 end
 
-trapHandler.register("APCharmedEscort", makeSummonTrap({
+makeSummonTrap({
+    name = "APCharmedEscort",
     sound = "spellGeneral",
     min = ESCORT_SIZE,
     max = ESCORT_SIZE,
@@ -32,10 +33,10 @@ trapHandler.register("APCharmedEscort", makeSummonTrap({
     checkGrabbed = false,
     requireSpawns = true,
     getVariants = localEnemies,
-    onSpawn = function(spawned, _, playerEntity)
+    onSpawn = function(spawned, _tile, playerEntity)
         spellCharm.charm(spawned, playerEntity)
     end,
-}))
+})
 
 apItemFactory.define({
     name = "AP_CharmedEscort",

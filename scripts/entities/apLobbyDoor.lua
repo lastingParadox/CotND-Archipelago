@@ -50,8 +50,7 @@ local function doorLabelKey(entity)
     end
 end
 
--- The door stands in the wall, so the label steps one tile off it towards the lobby
--- spawn. A horizontal door is passed through vertically, and a vertical one sideways.
+-- Steps the label one tile off the door towards the lobby spawn.
 local function labelPosition(entity, x, y)
     local lobbyX, lobbyY = marker.lookUpFirst(marker.Type.AP_SPAWN)
     if not lobbyX then return x, y end
@@ -150,8 +149,7 @@ local function lockedDoorState(entity, announce)
             local hintData = apStorage.saveData.npcHintLocations
                 and apStorage.saveData.npcHintLocations[npc]
             if hintData and hintData.LocationCode then
-                -- Send a hint request so the AP server (and other players) know we
-                -- are looking for this NPC.
+                -- Tells the AP server which NPC we are looking for.
                 if announce then
                     apClient.sendPacket({
                         datatype = "HintNpc",

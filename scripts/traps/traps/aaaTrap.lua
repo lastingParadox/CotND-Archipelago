@@ -1,9 +1,8 @@
 local makeSoundLoopTrap = (require "AP.scripts.traps.factories.makeSoundLoopTrap").makeSoundLoopTrap
-local TrapHandler       = require "AP.scripts.traps.trapHandler"
 
-TrapHandler.register("AaaTrap", makeSoundLoopTrap({
+makeSoundLoopTrap({
     name        = "AaaTrap",
-    flyawayText = "AAA!",
+    flyaway     = "AAA!",
     duration    = 5,
     minBurst    = 2,
     maxBurst    = 4,
@@ -18,4 +17,4 @@ TrapHandler.register("AaaTrap", makeSoundLoopTrap({
         "deathMetal_welcome",
         "deathMetal_death",
     },
-}))
+})

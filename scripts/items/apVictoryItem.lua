@@ -28,15 +28,15 @@ customEntities.register({
 apItemFactory.define({
     name = "AP_VictoryItem",
     texture = "items/ap_item/ap_item_victory.png",
-    hint = "Victory",
+    hint = "Artifact of Victory",
+    flyaway = "Victory!",
     components = {
         spriteSheet = { frameX = 1, frameY = 1 },
         AP_victoryItem = {},
     },
 })
 
--- Buying it is the victory trigger, so the goal has to be met before the diamonds are.
--- The purchase itself is handled by the shop slot, which owns the price tag.
+-- Buying it is the victory trigger, so the goal is checked before the diamond balance.
 apGrants.define({
     carrier = "AP_VictoryItem",
     gate = function() return progression.getGoalUnlockText() end,

@@ -17,8 +17,7 @@ local apTypes = require("AP.scripts.utils.types")
 local apFollowerChain = require("AP.scripts.character.apFollowerChain")
 local handlers = require("AP.scripts.client.initHandlers")
 
--- Translucency for the deathlink name tag (drawText `opacity`, like flyaways),
--- so it reads like a soft multiplayer username rather than a hard label. 0..1.
+-- Translucency of the deathlink name tag, 0..1, passed to drawText as `opacity`.
 local MARV_TAG_OPACITY = 0.5
 
 local function applyDeathlink(message)
@@ -80,9 +79,7 @@ apEventSync.subscribe("deathlink", function(data)
     applyDeathlink(data.message)
 end)
 
--- Only the host is handed the packet, so it publishes rather than applying: the
--- flyaways, countdown and damage all have to happen on every client's own
--- simulation or they exist on one screen only.
+-- Only the host is handed the packet, so it publishes rather than applying.
 handlers.register("Death", function(message, ctx)
     if not apStorage.saveData.deathlink or currentLevel.isSafe() then return end
 

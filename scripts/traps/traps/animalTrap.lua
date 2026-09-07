@@ -1,21 +1,11 @@
-local currentLevel = require("necro.game.level.CurrentLevel")
+local ecs     = require("system.game.Entities")
 local gameDLC = require("necro.game.data.resource.GameDLC")
-local player = require("necro.game.character.Player")
-local rng = require("necro.game.system.RNG")
-local turn = require("necro.cycles.Turn")
-local object = require("necro.game.object.Object")
-
-local ecs = require("system.game.Entities")
+local object  = require("necro.game.object.Object")
+local rng     = require("necro.game.system.RNG")
 
 local possession = require("Sync.character.chaunter.Possession")
 
-local apFlyaways = require("AP.scripts.ui.apFlyaways")
-local TrapHandler = require("AP.scripts.traps.trapHandler")
-
-local animalTrapPossessors = {}
-animalTrapPossessors = script.persist(function()
-	return animalTrapPossessors
-end)
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
 local MARV_CHANCE = 0.05
 
@@ -95,7 +85,6 @@ local function tryTransformPlayer(playerEntity, channel, pool)
 
 		local animal = object.spawn(animalType, playerEntity.position.x, playerEntity.position.y)
 		if animal and possession.attach(playerEntity, animal) then
-			animalTrapPossessors[playerEntity.id] = true
 			return true
 		end
 
@@ -107,43 +96,10 @@ local function tryTransformPlayer(playerEntity, channel, pool)
 	return false
 end
 
-local function animalTrap(ev)
-	local pool = getAnimalPool()
-	if #pool == 0 then
-		return false
-	end
-
-	local channel = rng.makeChannel(
-		"AP-AnimalTrap",
-		tostring(currentLevel.getSeed()),
-		tostring(turn.getCurrentTurnID())
-	)
-
-	local transformedAny = false
-
-	for _, entity in ipairs(player.getPlayerEntities()) do
-		if entity and entity.playableCharacter then
-			local transformed = rng.roll(MARV_CHANCE, channel)
-				and tryTransformPlayer(entity, channel, { "Marv" })
-
-			transformed = transformed or tryTransformPlayer(entity, channel, pool)
-
-			if transformed then
-				transformedAny = true
-				apFlyaways.addToFlyawayQueue({
-					entity = entity,
-					text = "Animal Trap!",
-				})
-			end
-		end
-	end
-
-	return transformedAny
-end
-
-event.holderGetActionItem.add("APAnimalTrapSuppressEject", { order = "holster", sequence = 1, filter = "Sync_possessableAbility" },
+event.holderGetActionItem.add("APAnimalTrapSuppressEject",
+	{ order = "holster", sequence = 1, filter = "Sync_possessableAbility" },
 	possession.wrapHandler(function(ev, possessor)
-		if not possessor or not animalTrapPossessors[possessor.id] then
+		if not (possessor and trapSystem.isActive("AnimalTrap", possessor)) then
 			return
 		end
 
@@ -156,16 +112,24 @@ event.holderGetActionItem.add("APAnimalTrapSuppressEject", { order = "holster", 
 
 event.Sync_possessionDetach.add("APAnimalTrapClearPossessorFlag", { order = "possessorTarget" }, function(ev)
 	if ev and ev.possessor then
-		animalTrapPossessors[ev.possessor.id] = nil
+		trapSystem.stop("AnimalTrap", ev.possessor)
 	end
 end)
 
-event.gameStateLevel.add("APAnimalTrapClearPossessorFlags", "splitScreen", function(ev)
-	for possessorID in pairs(animalTrapPossessors) do
-		animalTrapPossessors[possessorID] = nil
-	end
-end)
+trapSystem.define({
+	name      = "AnimalTrap",
+	flyaway   = "Animal Trap!",
+	perPlayer = true,
+	stateful  = true,
+	apply     = function(ctx)
+		local pool = getAnimalPool()
+		if #pool == 0 then return false end
 
-TrapHandler.register("AnimalTrap", animalTrap)
+		local transformed = rng.roll(MARV_CHANCE, ctx.channel)
+			and tryTransformPlayer(ctx.entity, ctx.channel, { "Marv" })
 
-return animalTrap
+		transformed = transformed or tryTransformPlayer(ctx.entity, ctx.channel, pool)
+
+		if not transformed then return false end
+	end,
+})

@@ -1,9 +1,9 @@
 local tutorialLevel = require "necro.game.data.level.TutorialLevel"
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
-TrapHandler.register("TutorialTrap", makeSimpleTrap({
-    flyawayText = "Tutorial time!",
-    after       = function() tutorialLevel.start() end,
-}))
+trapSystem.define({
+    name    = "TutorialTrap",
+    flyaway = "Tutorial time!",
+    finish  = function() tutorialLevel.start() end,
+})

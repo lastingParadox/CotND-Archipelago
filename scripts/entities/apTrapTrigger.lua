@@ -188,8 +188,7 @@ local function isZoneDisabled(entity)
     return zone == 5 and not progression.isDLCEnabled("Amplified")
 end
 
--- How each lock draws while shut. zoneProgress varies with the slot's options,
--- so it stays below rather than joining the table.
+-- How each lock draws while shut; zoneProgress varies per slot and is built below.
 local lockedTiles = {
     apModules = "LobbyStairsDisabled",
     modConflict = "LobbyStairsDisabled",
@@ -277,8 +276,7 @@ end)
 -- Visual update event
 event.updateVisuals.add("apTrapVisuals", { order = "trapVisuals", sequence = 1 }, function(_)
     for entity in ecs.entitiesWithComponents({ "AP_trapUnlock" }) do
-        -- No tile info before the level is sized; bail rather than erroring here
-        -- every frame, which buries whatever actually stopped the level loading.
+        -- No tile info before the level is sized.
         local tileInfo = tileTypes.getTileInfo(tile.get(entity.position.x, entity.position.y))
         if tileInfo then
             local unlocked = isUnlocked(entity)
@@ -336,8 +334,7 @@ event.trapTrigger.add("apHintTrapSetup", {
     ev.trap.trapStartRun.options = { characterOverride = chosenChar }
 end)
 
--- With a single zone reachable, AP Zones Mode is a single-zone run wearing the wrong
--- mode, so we switch the mode over to "APSingleZone".
+-- Switches to "APSingleZone" when only one zone is reachable.
 event.trapTrigger.add("apZonesModeSingleZone", {
     filter = "trapStartRun",
     order = "descend",

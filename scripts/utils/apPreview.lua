@@ -13,8 +13,7 @@ local apPreview = {}
 
 local OUTLINE_ALPHA = 0.85
 
--- Declared here rather than with the renderer: a settings global is bound to the script
--- that assigns it, so only this file can read it.
+-- Declared here, since a settings global is bound to the script that assigns it.
 apShowLocationOutlines = settings.user.bool({
     id = "AP.video.locationOutlines",
     name = "Outline location checks",

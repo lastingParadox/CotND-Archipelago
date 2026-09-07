@@ -75,9 +75,7 @@ event.objectTryCollectItem.add("pickupAPModeShrine", { order = "priceTag", seque
     end
 end)
 
--- No carrier: AP_ModeShrine stands in for all eight modes and for the shrine items too,
--- so which one it is lives in its label rather than its type. The lobby handler above
--- reads that; this is the fallback for a grant.
+-- AP_ModeShrine stands in for all eight modes, so which one it is lives in its label.
 local GRANTED_MODES = {
     APNoReturnMode    = "No Return",
     APHardMode        = "Hard",

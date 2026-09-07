@@ -5,15 +5,13 @@ local apInventory = require("AP.scripts.utils.apInventory")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 local progression = require("AP.scripts.client.progression")
 
--- The carrier for the coin multiplier tiers. The tiers themselves are the vanilla
--- CoinsX15 and CoinsX2 innates, which apInventory grants in order.
+-- The carrier for the coin multiplier tiers, which are the vanilla CoinsX15 and CoinsX2.
 apItemFactory.define({
     name = "AP_ProgressiveCoinMultiplier",
     rawTexture = "ext/items/coins_x15.png",
     hint = L("Progressive Coin Multiplier", "AP.item.progressiveCoinMultiplier"),
     flyaway = L("Coin Multiplier Increased!", "AP.item.progressiveCoinMultiplier.flyaway"),
-    -- The tier is counted from the received-items log, so re-equipping the innates is the
-    -- whole grant.
+    -- The tier is counted from the received-items log, so re-equipping is the whole grant.
     grant = {
         item = "APProgressiveCoinMultiplier",
         carrier = false,

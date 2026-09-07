@@ -72,8 +72,7 @@ local MATERIAL_PRICES = {
     ["Jeweled"]  = { coins = 120, blood = 24 },
 }
 
--- Mirrors Sync_WeaponReallyBigSword's deployed-sword behaviour; both shapes below are
--- that weapon in a different material.
+-- Mirrors Sync_WeaponReallyBigSword's deployed-sword behaviour.
 local DEPLOYED_SWORD_COMPONENTS = {
     weapon        = { damage = 1 },
     weaponPattern = { pattern = { tiles = {} } },
@@ -179,8 +178,7 @@ customWeapons.registerShape {
     end,
 }
 
--- Sync_weaponCollisionCheck is carried only by the Zweihaender family, so it needs no
--- accompanying name test.
+-- Sync_weaponCollisionCheck is carried only by the Zweihaender family, so no name test.
 event.inventoryEquipItem.add("APZweihanderPickUp", { order = "equip" }, function(ev)
     if ev.item.Sync_weaponCollisionCheck and ev.holder.name ~= "Sync_Klarinetta" then
         ev.holder.inputContextLayerDiagonal       = {}

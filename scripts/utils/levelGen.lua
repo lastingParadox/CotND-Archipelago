@@ -127,9 +127,7 @@ event.levelLoad.add("readRoomData", "currentLevel", function(ev)
     rooms = ev.rooms or {}
 end)
 
----------------------------
--- Grimmy's Monocle wall gold fix --
----------------------------
+-- Grimmy's Monocle wall gold fix
 
 local function renderWallContent(item, x, y)
     local proto = ecs.getEntityPrototype(item)

@@ -1,11 +1,8 @@
-local collision    = require("necro.game.tile.Collision")
-local currentLevel = require("necro.game.level.CurrentLevel")
-local rng          = require("necro.game.system.RNG")
-local tile         = require("necro.game.tile.Tile")
-local turn         = require("necro.cycles.Turn")
+local collision = require("necro.game.tile.Collision")
+local rng       = require("necro.game.system.RNG")
+local tile      = require("necro.game.tile.Tile")
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
 local ENCASE_RADIUS   = 1    -- solid wall ring at this Chebyshev distance
 local SCATTER_RADIUS  = 5    -- random splatter out to this distance
@@ -18,15 +15,14 @@ local function placeDirt(x, y)
     end
 end
 
-TrapHandler.register("EarthTrap", makeSimpleTrap({
-    flyawayText = "Earth Trap!",
-    sound  = "spellEarth",
-    setup  = function()
-        return { channel = rng.makeChannel(currentLevel.getSeed() + turn.getCurrentTurnID()) }
-    end,
-    action = function(entity, ctx)
-        local px = entity.position.x
-        local py = entity.position.y
+trapSystem.define({
+    name    = "EarthTrap",
+    flyaway = "Earth Trap!",
+    sound   = "spellEarth",
+    apply   = function(ctx)
+        local px = ctx.entity.position.x
+        local py = ctx.entity.position.y
+
         for dx = -SCATTER_RADIUS, SCATTER_RADIUS do
             for dy = -SCATTER_RADIUS, SCATTER_RADIUS do
                 local dist = math.max(math.abs(dx), math.abs(dy))
@@ -38,4 +34,4 @@ TrapHandler.register("EarthTrap", makeSimpleTrap({
             end
         end
     end,
-}))
+})

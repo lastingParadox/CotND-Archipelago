@@ -1,11 +1,12 @@
 local confusion = require("necro.game.character.Confusion")
-local player    = require("necro.game.character.Player")
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
-TrapHandler.register("ConfusionTrap", makeSimpleTrap({
-    flyawayText = "Confusion!",
-    guard  = function(entity) return not confusion.isConfused(entity) end,
-    action = function(entity) confusion.inflict(entity, 24) end,
-}))
+trapSystem.define({
+    name    = "ConfusionTrap",
+    flyaway = "Confusion!",
+    apply   = function(ctx)
+        if confusion.isConfused(ctx.entity) then return false end
+        confusion.inflict(ctx.entity, 24)
+    end,
+})

@@ -13,8 +13,7 @@ local apGrants = require("AP.scripts.items.apGrants")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 local apPreview = require("AP.scripts.utils.apPreview")
 
--- Cadence's body stands in for the editor; a spawned carrier hides it and draws its own
--- character via event.render below.
+-- Cadence's body stands in for the editor; a spawned carrier hides it and draws its own.
 apItemFactory.define({
     name = "AP_Character",
     rawTexture = "ext/entities/player1_armor_body.png",
@@ -103,7 +102,6 @@ event.render.add("apCharacterContents", { order = "contents", sequence = 1 }, fu
 end)
 
 -- Unlocking is recorded when the item is logged, so a grant only has to announce it.
--- Neither a character nor an NPC is ever spawned at the player's feet.
 local function greetPlayers(sound_, players)
     for _, playerEntity in ipairs(players) do
         if playerEntity then sound.playFromEntity(sound_, playerEntity) end

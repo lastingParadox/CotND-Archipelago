@@ -20,8 +20,7 @@ for denomination = 1, 4 do
             itemPickupSound = { sound = "pickupDiamond" },
             diamondPickupAnimation = {},
         },
-        -- currency.create picks these same entities for the piles dug out of walls, so the
-        -- carrier banks whatever quantity it happens to hold rather than its denomination.
+        -- Banks whatever quantity the carrier holds rather than its denomination.
         grant = {
             item = "APDiamond" .. denomination,
             sound = "pickupDiamond",

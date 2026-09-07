@@ -53,8 +53,7 @@ function apBonusPotion.apply(entity)
     grantPotions(entity, progression.getPotionMode())
 end
 
--- One potion on top of whatever is held, for the Spare Potion filler. grantPotions writes
--- the quantity straight onto the stack, so nothing else enforces AP_StackablePotion's limit.
+-- One potion on top of whatever is held, for the Spare Potion filler.
 function apBonusPotion.addPotion(entity)
     if not entity then return end
 

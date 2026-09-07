@@ -1,22 +1,20 @@
-local color        = require "system.utils.Color"
-local currentLevel = require "necro.game.level.CurrentLevel"
-local damage       = require "necro.game.system.Damage"
-local objectMap    = require "necro.game.object.Map"
-local overlay      = require "necro.render.Overlay"
-local rng          = require "necro.game.system.RNG"
-local screenShake  = require "necro.render.ScreenShake"
-local sound        = require "necro.audio.Sound"
-local tile         = require "necro.game.tile.Tile"
-local timer        = require "system.utils.Timer"
-local turn         = require "necro.cycles.Turn"
+local color       = require "system.utils.Color"
+local damage      = require "necro.game.system.Damage"
+local objectMap   = require "necro.game.object.Map"
+local overlay     = require "necro.render.Overlay"
+local rng         = require "necro.game.system.RNG"
+local screenShake = require "necro.render.ScreenShake"
+local sound       = require "necro.audio.Sound"
+local tile        = require "necro.game.tile.Tile"
+local timer       = require "system.utils.Timer"
 
-local apFlags        = require "AP.scripts.utils.flags"
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local apFlags    = require "AP.scripts.utils.flags"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
-TrapHandler.register("MeteorTrap", makeSimpleTrap({
-    flyawayText = "Meteor!",
-    setup = function()
+trapSystem.define({
+    name    = "MeteorTrap",
+    flyaway = "Meteor!",
+    start   = function(ctx)
         overlay.add({
             color   = color.rgba(255, 255, 255, 230),
             fadeIn  = timer.milliseconds(0),
@@ -26,17 +24,16 @@ TrapHandler.register("MeteorTrap", makeSimpleTrap({
         })
         sound.playUI("dragonRoar")
         sound.playUI("ogreDownswing")
-        local channel = rng.makeChannel(
-            "AP-MeteorTrap-" ..
-            tostring(currentLevel.getSeed()) ..
-            tostring(turn.getCurrentTurnID())
-        )
-        return { channel = channel, damagedEntities = {} }
+
+        ctx.state.damaged = {}
     end,
-    action = function(entity, ctx)
+    apply   = function(ctx)
+        local entity = ctx.entity
         screenShake.createOnEntity(entity, 0.5, 50)
+
         local px = entity.position.x
         local py = entity.position.y
+
         for dx = -5, 5 do
             for dy = -5, 5 do
                 local d2 = dx * dx + dy * dy
@@ -50,8 +47,8 @@ TrapHandler.register("MeteorTrap", makeSimpleTrap({
                     end
                     for _, target in objectMap.entitiesWithComponent(tx, ty, "killable") do
                         if target and target.killable and not target.killable.dead
-                                and not ctx.damagedEntities[target.id] then
-                            ctx.damagedEntities[target.id] = true
+                                and not ctx.state.damaged[target.id] then
+                            ctx.state.damaged[target.id] = true
                             damage.inflict({
                                 victim     = target,
                                 damage     = 5,
@@ -64,4 +61,4 @@ TrapHandler.register("MeteorTrap", makeSimpleTrap({
             end
         end
     end,
-}))
+})

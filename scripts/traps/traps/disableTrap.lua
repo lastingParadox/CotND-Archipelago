@@ -1,12 +1,8 @@
-local action       = require("necro.game.system.Action")
-local currentLevel = require("necro.game.level.CurrentLevel")
-local rng          = require("necro.game.system.RNG")
-local sound        = require("necro.audio.Sound")
-local turn         = require("necro.cycles.Turn")
+local action = require("necro.game.system.Action")
+local rng    = require("necro.game.system.RNG")
+local sound  = require("necro.audio.Sound")
 
-local apTrapStatus   = require "AP.scripts.ui.apTrapStatus"
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local DISABLE_BEATS = 16
 
@@ -22,92 +18,66 @@ local ACTION_TYPES = {
     { kind = "dig",       value = nil,                    name = "Digging" },
 }
 
-local disableKind      = nil
-local disableValue     = nil
-local disableName      = nil
-local disableRemaining = 0
-
-disableKind, disableValue, disableName, disableRemaining = script.persist(function()
-    return disableKind, disableValue, disableName, disableRemaining
-end)
-
-apTrapStatus.register("DisableTrap", function()
-    if disableRemaining > 0 and disableName then
-        return disableName .. " Disabled!"
-    end
-end)
-
 local function showBlocked(entity)
     sound.playFromEntity("error", entity)
 end
 
--- Tick down remaining beats each turn.
-event.turn.add("APDisableTrapTick", { order = "traps" }, function()
-    if disableRemaining > 0 then
-        disableRemaining = disableRemaining - 1
-    end
-end)
+---The disabled action, or nil while nothing is disabled.
+local function blocked(kind)
+    local state = trapSystem.stateOf("DisableTrap")
+    if state and state.kind == kind then return state end
+end
 
--- Block directional movement/attacks.
 event.objectDirection.add("APDisableTrapBlockDirection",
     { order = "storeAction", sequence = -1 },
     function(ev)
-        if disableRemaining <= 0 then return end
-        if disableKind ~= "direction" then return end
+        local state = blocked("direction")
+        if not state then return end
         if not ev.entity.playableCharacter then return end
-        if ev.action == disableValue then
+
+        if ev.action == state.value then
             ev.result = action.Result.INHIBIT
             showBlocked(ev.entity)
         end
     end
 )
 
--- Block special actions.
 event.objectSpecialAction.add("APDisableTrapBlockSpecial",
     { order = "storeAction", sequence = -1 },
     function(ev)
-        if disableRemaining <= 0 then return end
-        if disableKind ~= "special" then return end
+        local state = blocked("special")
+        if not state then return end
         if not ev.entity.playableCharacter then return end
-        if ev.action == disableValue then
+
+        if ev.action == state.value then
             ev.result = action.Result.INHIBIT
             showBlocked(ev.entity)
         end
     end
 )
 
--- Block digging.
 event.objectDig.add("APDisableTrapBlockDig",
     { order = "breakTile", sequence = -1 },
     function(ev)
-        if disableRemaining <= 0 then return end
-        if disableKind ~= "dig" then return end
-        if not ev.entity or not ev.entity.playableCharacter then return end
+        if not blocked("dig") then return end
+        if not (ev.entity and ev.entity.playableCharacter) then return end
+
         ev.strength = 0
         showBlocked(ev.entity)
     end
 )
 
--- Clean up on run reset.
-event.gameStateReset.add("APDisableTrapReset", { order = "resetRunVariables" }, function()
-    disableKind      = nil
-    disableValue     = nil
-    disableName      = nil
-    disableRemaining = 0
-end)
+trapSystem.define({
+    name      = "DisableTrap",
+    flyaway   = function(ctx) return ctx.state.name .. " Disabled!" end,
+    status    = function(ctx) return ctx.state.name .. " Disabled!" end,
+    duration  = DISABLE_BEATS,
+    tickOrder = "traps",
+    start     = function(ctx)
+        local chosen = ACTION_TYPES[rng.range(1, #ACTION_TYPES, ctx.channel)]
 
-TrapHandler.register("DisableTrap", makeSimpleTrap({
-    flyawayText = function(entity, ctx)
-        return ctx.chosen.name .. " Disabled!"
+        ctx.state.kind  = chosen.kind
+        ctx.state.value = chosen.value
+        ctx.state.name  = chosen.name
     end,
-    setup = function()
-        if disableRemaining > 0 then return false end
-        local channel = rng.makeChannel(currentLevel.getSeed() + turn.getCurrentTurnID())
-        local chosen  = ACTION_TYPES[rng.range(1, #ACTION_TYPES, channel)]
-        disableKind      = chosen.kind
-        disableValue     = chosen.value
-        disableName      = chosen.name
-        disableRemaining = DISABLE_BEATS
-        return { chosen = chosen }
-    end,
-}))
+})

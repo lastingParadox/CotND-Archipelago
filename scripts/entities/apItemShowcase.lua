@@ -27,9 +27,7 @@ local function orderedTable(pairsArray)
     return result
 end
 
--- Display data for the AP-only unlocks. Membership and category come from the
--- slot's shipped item list; these entries only say how to draw each one, and an
--- entry is only needed when the AP id is not itself a drawable prototype.
+-- How to draw each AP-only unlock whose id is not itself a drawable prototype.
 apItemShowcase.apShowcaseList = orderedTable({
     { key = "ShrineOfWar",             value = { category = "shrine" } },
     { key = "ShrineOfBlood",           value = { category = "shrine" } },
@@ -101,8 +99,7 @@ for _, buff in ipairs(apBuffItem.buffs) do
     table.insert(apItemShowcase.apShowcaseList.__keyOrder, buff.entity)
 end
 
--- Hub display order. `section` splits the room's two halves; the geometry
--- fields are per-category overrides for the chamber generator.
+-- Hub display order; `section` splits the room's halves and the geometry fields override it.
 apItemShowcase.categories = {
     { id = "character", name = "Characters",      section = "game", offsetY = 0 },
     { id = "weapon",    name = "Weapons",         section = "game" },
@@ -131,8 +128,7 @@ for _, descriptor in ipairs(apItemShowcase.categories) do
     apItemShowcase.categoryByID[descriptor.id] = descriptor
 end
 
--- Mode shrines are drawn as the shrine itself rather than the carrier item, so
--- each needs its own prototype; apModeShrine registers them from these entries.
+-- Mode shrines are drawn as the shrine, so apModeShrine registers a prototype per entry.
 function apItemShowcase.getModeShrineDisplay(modeName)
     return "AP_ModeShrine" .. modeName:gsub("%s", "")
 end
@@ -145,8 +141,7 @@ for _, name in ipairs(apItemShowcase.apShowcaseList.__keyOrder) do
     end
 end
 
--- Showcases sit one tile apart, so a name wider than its tile runs into its
--- neighbour's. Break it across lines instead.
+-- Breaks a name across lines, since showcases sit one tile apart.
 local LABEL_LINE_LENGTH = 11
 
 local function wrapLabel(text)
@@ -177,9 +172,7 @@ function apItemShowcase.getShowcaseLabel(name, data, proto)
     return wrapLabel(text)
 end
 
--- Display data for a shipped item: whatever apShowcaseList declares, else the id
--- doubles as its own prototype. The slot's category always wins, since it comes
--- from the apworld's own item pool.
+-- Display data from apShowcaseList, else the id doubles as its own prototype.
 local function showcaseDataFor(id, category)
     local declared = apItemShowcase.apShowcaseList[id]
     if not declared then
@@ -217,8 +210,7 @@ function apItemShowcase.getShowcaseData(name)
     return getRoomIndex()[name] or apItemShowcase.apShowcaseList[name]
 end
 
--- The shipped list is already filtered to what this slot can receive, so the only
--- thing left to check is whether the sprite exists in this install.
+-- The shipped list is already filtered, so only the sprite's existence is checked here.
 function apItemShowcase.getShowcaseCategories()
     local index = getRoomIndex()
     local byCategory = {}
@@ -316,16 +308,14 @@ event.render.add("apItemShowCasePreview", { order = "characterPreview", sequence
             local preview = ecs.getEntityPrototype(data.preview or item)
 
             if preview then
-                -- Everything the slot excludes is filtered out of the room, so
-                -- what is here is either found or simply not found yet.
+                -- Everything here is either found or simply not found yet.
                 local locked = isItemLocked(item, data)
                 local descriptor = apItemShowcase.categoryByID[data.category]
 
                 apPreview.draw(preview, {
                     entity = entity,
                     silhouette = locked,
-                    -- Sprites within a category vary enough in height that some
-                    -- need their own nudge off the label.
+                    -- Per-sprite nudge off the label, for the taller entries in a category.
                     offsetY = data.offsetY or (descriptor and descriptor.offsetY) or 5,
                     countText = not locked and countText(item, data) or nil,
                 })

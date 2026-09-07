@@ -12,8 +12,7 @@ customEntities.register({
 })
 
 local AP_ZONES_KEY = "mod.AP.lobby.stair.zones"
--- Vanilla's own label. With every zone unlocked the run is an All Zones run in all
--- but the mode id, which stays APAllZones because the whole AP pipeline keys off it.
+-- Vanilla's own label, used once every zone is unlocked.
 local ALL_ZONES_KEY = "label.lobby.stair.allZones"
 
 local function currentKey()

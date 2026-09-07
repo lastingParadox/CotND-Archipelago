@@ -27,12 +27,6 @@ components.register({
     AP_flyaway = {
         components.field.string("text", "AP Item Obtained"),
     },
-    AP_followerChain = {
-        components.field.entityID("parent"),
-        components.field.entityID("child"),
-        components.field.entityID("root"),
-        components.field.bool("temporary", true)
-    },
     AP_followerDamageParentWhileDead = {
         components.constant.float("damageRatio", 0.2),
         components.field.enum("type", damage.Flag, APFlags.DAMAGE_DEATH_LINK),
@@ -210,6 +204,9 @@ components.register({
     },
     AP_trapJanitorNext = {},
     AP_trapJanitorReset = {},
+    AP_unbannedItems = {
+        components.constant.table("items"),
+    },
     AP_uncertainWeapon = {},
     AP_pawnbrokerPricing = {},
     AP_trapUnlock = {

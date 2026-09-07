@@ -61,8 +61,7 @@ apItems.isOwnShopItem = function(item, slotName)
         tonumber(item.location_code) >= shopLocationRange[1] and tonumber(item.location_code) <= shopLocationRange[2]
 end
 
--- Whether the entity standing in for this AP item is one the player collects in person,
--- rather than a carrier that hands the effect over and is deleted.
+-- Whether the player collects this entity in person rather than it being a deleted carrier.
 apItems.isPhysicalItem = function(itemId)
     if not itemId or itemId == "" then return false end
 
@@ -161,8 +160,7 @@ local function getModeObjectData(itemName)
     }
 end
 
--- Shrine entities cannot be picked up, so a chest or shop holding one would offer a
--- check the player has no way to take.
+-- Shrine entities cannot be picked up, so a chest or shop must never hold one.
 local function getShrineObjectData(itemName, displayName)
     local proto = itemName and ecs.getEntityPrototype(itemName)
     if not (proto and proto.shrine and proto.sprite) then return nil end
@@ -218,8 +216,7 @@ apItems.entityMap = {
     APProgressiveCoinMultiplier = { name = "AP_ProgressiveCoinMultiplier", price = 2 },
     APGoldenLuteShard = { name = "AP_GoldenLuteShard", price = 4, named = true },
 
-    -- Vanilla names these "Per Run", so the apworld's name is the honest one and has to
-    -- override the prototype's own label.
+    -- The apworld's name overrides the prototype label, which vanilla calls "Per Run".
     AddchestRed = { name = "AddchestRed", price = 1, named = true, physical = true },
     AddchestWhite = { name = "AddchestWhite", price = 1, named = true, physical = true },
     AddchestBlack = { name = "AddchestBlack", price = 1, named = true, physical = true },
@@ -298,7 +295,6 @@ function apItems.shopItemToObjectData(item)
             }
         }
     else
-        -- Static items
         -- APItem is the only entry that depends on the scout, so it is built per call.
         local entry = itemId == "APItem" and {
             name = FOREIGN_ITEM_ENTITIES[apItems.itemClassName(item["Classification"])],

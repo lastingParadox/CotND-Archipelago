@@ -2,8 +2,7 @@ local collision = require "necro.game.tile.Collision"
 local object    = require "necro.game.object.Object"
 local rng       = require "necro.game.system.RNG"
 
-local makeFloorTrap = (require "AP.scripts.traps.factories.makeFloorTrap").makeFloorTrap
-local TrapHandler   = require "AP.scripts.traps.trapHandler"
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local TRAP_CHANCE = 0.10
 
@@ -40,16 +39,19 @@ do
     end
 end
 
--- A tile already holding a trap has nothing to gain, and one under a player would fire the
--- instant they moved off it.
+-- Skips tiles that already hold a trap and tiles a player is standing on.
 local OCCUPIED = collision.Type.mask(collision.Type.TRAP, collision.Type.PLAYER)
 
-TrapHandler.register("TrapTrap", makeFloorTrap({
-    flyawayText = "Trap Trap!",
-    setTile     = function(x, y, channel)
-        if collision.check(x, y, OCCUPIED) then return end
-        if not rng.roll(TRAP_CHANCE, channel) then return end
+trapSystem.define({
+    name    = "TrapTrap",
+    flyaway = "Trap Trap!",
+    voice   = "voiceConfused",
+    floor   = {
+        setTile = function(x, y, ctx)
+            if collision.check(x, y, OCCUPIED) then return end
+            if not rng.roll(TRAP_CHANCE, ctx.channel) then return end
 
-        object.spawn(rng.choice(weightedTraps, channel), x, y)
-    end,
-}))
+            object.spawn(rng.choice(weightedTraps, ctx.channel), x, y)
+        end,
+    },
+})

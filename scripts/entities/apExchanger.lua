@@ -11,8 +11,7 @@ local progression = require("AP.scripts.client.progression")
 
 local GOLD_COST = 50
 
--- monkeyHit is a group of three files the engine picks between, so listing it three
--- times against monkeyGrab gives the four-way choice.
+-- monkeyHit is a group of three files, so listing it three times gives a four-way choice.
 local MONKEY_SOUNDS = { "monkeyGrab", "monkeyHit", "monkeyHit", "monkeyHit" }
 
 apNpc.make("AP_Exchanger", {
@@ -51,9 +50,7 @@ apNpc.make("AP_Exchanger", {
     soundPriceTagPurchaseFail = {},
     soundPriceTagPurchaseSuccess = {},
 
-    -- The numeric priceTagLabel is left off: one trade takes every 50 the player has, so
-    -- the tag states the rate instead of a cost. secretShopLabel is the only price label
-    -- that draws text, and it stays up at 0 gold where the numeric one would vanish.
+    -- secretShopLabel rather than priceTagLabel, so the tag states the rate and survives 0 gold.
     secretShopLabel = {
         text = "%d:1",
         offsetY = 16,
@@ -72,9 +69,7 @@ event.objectInteract.add("apExchangerTrade",
     function(ev)
         if ev.suppressed then return end
 
-        -- The price tag already took the first 50 and refused anyone who could not pay it,
-        -- so what is left here converts too: lobby gold has no other use, and trading it a
-        -- coin at a time was just repetition.
+        -- The price tag already took the first 50, so the remaining balance converts too.
         local remaining = currency.get(ev.interactor, currency.Type.GOLD)
         local extra = math.floor(remaining / GOLD_COST)
 
@@ -87,8 +82,7 @@ event.objectInteract.add("apExchangerTrade",
         currency.add(ev.interactor, apFlags.CURRENCY_AP_DIAMOND, diamonds)
         progression.changeDiamonds(diamonds)
 
-        -- priceTagSuccessFlyaway's text is fixed at schema load and fires before the total
-        -- is known, so the payout announces itself here.
+        -- Announced here, since priceTagSuccessFlyaway's text is fixed at schema load.
         flyaway.create({
             entity = ev.interactor,
             text = "+" .. diamonds .. (diamonds == 1 and " Diamond" or " Diamonds"),
@@ -97,8 +91,7 @@ event.objectInteract.add("apExchangerTrade",
         local channel = rng.makeChannel(currentLevel.getSeed(), ev.entity.id,
             progression.getDiamonds() or 0)
 
-        -- Played here rather than through soundInteract, whose sound is a constant and
-        -- so cannot vary, and which drowned this out when both fired.
+        -- Played here rather than through soundInteract, whose sound is a constant.
         local monkey = MONKEY_SOUNDS[rng.int(#MONKEY_SOUNDS, channel) + 1]
 
         sound.playFromEntity(monkey, ev.entity, { deduplicationID = ev.interactor.id })

@@ -1,12 +1,9 @@
-local currentLevel = require "necro.game.level.CurrentLevel"
-local ecs          = require "system.game.Entities"
-local rng          = require "necro.game.system.RNG"
-local sound        = require "necro.audio.Sound"
-local team         = require "necro.game.character.Team"
-local turn         = require "necro.cycles.Turn"
+local ecs   = require "system.game.Entities"
+local sound = require "necro.audio.Sound"
+local team  = require "necro.game.character.Team"
 
-local makeSummonTrap = (require "AP.scripts.traps.factories.makeSummonTrap").makeSummonTrap
-local TrapHandler    = require "AP.scripts.traps.trapHandler"
+local summon     = (require "AP.scripts.traps.factories.makeSummonTrap").summon
+local trapSystem = require "AP.scripts.traps.trapSystem"
 
 local GROUPS = {
     Skeleton = {
@@ -126,8 +123,7 @@ local GROUPS = {
             max         = 6,
             radius      = 4,
             flyawayText = "Slime Trap!",
-            -- Slime6 through Slime8 are Amplified-only; without it they simply fail to
-            -- spawn, the same way the Skeleton group's skulls do.
+            -- Slime6 through Slime8 are Amplified-only and simply fail to spawn without it.
             variants    = {
                 Slime  = 3,
                 Slime2 = 10,
@@ -171,27 +167,10 @@ local GROUPS = {
     },
 }
 
--- Sorted iteration keeps the weighted list identical on every client.
-local groupNames = {}
-for name in pairs(GROUPS) do
-    table.insert(groupNames, name)
-end
-table.sort(groupNames)
-
-local trapFns = {}
-local weightedGroups = {}
-for _, name in ipairs(groupNames) do
-    trapFns[name] = makeSummonTrap(GROUPS[name].config)
-    for _ = 1, GROUPS[name].weight or 1 do
-        table.insert(weightedGroups, name)
-    end
-end
-
-TrapHandler.register("SummonTrap", function(ev, args)
-    local variant = args and args.variant
-    if not (variant and trapFns[variant]) then
-        local channel = rng.makeChannel(currentLevel.getSeed() + turn.getCurrentTurnID())
-        variant = rng.choice(weightedGroups, channel)
-    end
-    return trapFns[variant](ev)
-end)
+-- One trap, seven flavours, drawn off the trap's own channel.
+trapSystem.define({
+    name     = "SummonTrap",
+    variants = GROUPS,
+    flyaway  = function(ctx) return ctx.state.flyaway or ctx.variant.config.flyawayText end,
+    apply    = function(ctx) return summon(ctx, ctx.variant.config) end,
+})

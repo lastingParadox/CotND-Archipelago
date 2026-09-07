@@ -21,9 +21,7 @@ local function rollItem(channel)
     return choice ~= "" and choice or nil
 end
 
--- A carrier standing on a location wears the item it will hand over, so the roll has to
--- come out the same on every client and again after a rollback. The shop copy has no
--- location and keeps its own sprite.
+-- A carrier on a location wears the item it will hand over, rolled identically on every client.
 event.objectSpawn.add("APRandomItemSprite", { order = "overrides", filter = "AP_randomItem" },
     function(ev)
         local entity = ev.entity
@@ -58,8 +56,7 @@ apItemFactory.define({
     components = {
         AP_randomItem = {},
     },
-    -- Taken in person it already is the item it looks like. Without a roll -- the shop
-    -- copy -- the pickup declines and the grant coming back from AP delivers it instead.
+    -- Taken in person it is already the item it looks like; without a roll the pickup declines.
     grant = {
         item = "APRandomItem",
         apply = function(collector, carrier, ctx)

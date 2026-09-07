@@ -3,11 +3,9 @@ local sound     = require("necro.audio.Sound")
 local subtitles = require("necro.render.hud.Subtitles")
 local timer     = require("system.utils.Timer")
 
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
-local TrapHandler    = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
--- Durations approximate each clip's spoken length; LINE_GAP pads between
--- lines so clips never talk over each other.
+-- Durations approximate each clip's spoken length, with LINE_GAP padding between lines.
 local LINE_GAP = 0.75
 
 local TUTORIAL_LINES = {
@@ -19,38 +17,33 @@ local TUTORIAL_LINES = {
     { sound = "cadenceTutorial6", text = "That trap is mostly harmless, but Eli warned me of deadlier traps to come.", duration = 6 },
 }
 
-local tutorialQueue = {}
-local nextLineTime  = 0
-tutorialQueue, nextLineTime = script.persist(function()
-    return tutorialQueue, nextLineTime
-end)
+-- Backstop only; the trap ends itself once the queue runs dry.
+local MAX_SECONDS = 60
 
--- Tick-driven so lines keep playing while the player stands still (the old
--- turn-driven scheduler stalled between player actions).
-event.tick.add("APExpositionTrapPlayLines", { order = "lobby", sequence = 3 }, function()
-    if #tutorialQueue == 0 then return end
-    if gameState.isPaused() then return end
-    if timer.getGlobalTime() < nextLineTime then return end
-    local line = table.remove(tutorialQueue, 1)
-    sound.playUI(line.sound)
-    subtitles.say(line.text)
-    nextLineTime = timer.getGlobalTime() + line.duration + LINE_GAP
-end)
-
-event.gameStateReset.add("APExpositionTrapReset", { order = "resetRunVariables" }, function()
-    tutorialQueue = {}
-    nextLineTime  = 0
-end)
-
-TrapHandler.register("ExpositionTrap", makeSimpleTrap({
-    flyawayText = "Exposition!",
-    setup = function()
-        if #tutorialQueue > 0 then return false end
+trapSystem.define({
+    name     = "ExpositionTrap",
+    flyaway  = "Exposition!",
+    duration = MAX_SECONDS,
+    clock    = trapSystem.Clock.REAL,
+    -- A speech scheduler: audio and subtitles, nothing simulated.
+    storage  = trapSystem.Storage.VOLATILE,
+    start    = function(ctx)
+        ctx.state.index    = 1
+        ctx.state.nextTime = 0
+        return true
     end,
-    after = function()
-        for _, line in ipairs(TUTORIAL_LINES) do
-            tutorialQueue[#tutorialQueue + 1] = line
-        end
-        nextLineTime = 0
+    -- Tick-driven so lines keep playing while the player stands still.
+    tick     = function(ctx)
+        if gameState.isPaused() then return end
+        if timer.getGlobalTime() < ctx.state.nextTime then return end
+
+        local line = TUTORIAL_LINES[ctx.state.index]
+        if not line then return trapSystem.stop("ExpositionTrap") end
+
+        sound.playUI(line.sound)
+        subtitles.say(line.text)
+
+        ctx.state.index    = ctx.state.index + 1
+        ctx.state.nextTime = timer.getGlobalTime() + line.duration + LINE_GAP
     end,
-}))
+})

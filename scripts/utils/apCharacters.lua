@@ -27,9 +27,7 @@ apCharacters.characterSet = {
     ["Shovel Knight"] = true,
 }
 
--- Entity name <-> AP name, both directions, for the lobby NPCs the apworld ships
--- as items. Built from AP_npc, which vanilla.lua attaches at schema load; the
--- cageable-but-not-randomised NPCs carry an empty apName and are excluded here.
+-- Entity name to AP name and back, built from the AP_npc components vanilla.lua attaches.
 local npcIndex
 
 local function getNpcIndex()
@@ -100,8 +98,7 @@ function apCharacters.getMissingRequiredItems(name)
         end
     end
 
-    -- Soft only gates on unique gear, but Dorian is unplayable without his boots: the
-    -- armour he cannot remove leaves him no other way to move.
+    -- Dorian is the exception to Soft's unique-gear-only rule; his boots are movement.
     if characterUnlocks == "required_items_hard" or name == "Dorian" then
         collectMissing(requirements.normal)
     end
@@ -124,8 +121,7 @@ function apCharacters.isCharacterDisabled(name)
     return false
 end
 
--- The full rule the character selectors enforce, so anything else that picks a
--- character for the player agrees with them.
+-- The full rule the character selectors enforce.
 function apCharacters.isCharacterPlayable(name)
     if apCharacters.isCharacterDisabled(name) then return false end
     if not progression.getCharacters(apCharacters.cotNDCharToAPLocation(name)) then return false end

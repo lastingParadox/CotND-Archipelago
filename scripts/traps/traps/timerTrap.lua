@@ -1,42 +1,23 @@
-local player = require("necro.game.character.Player")
+local APFlags    = require("AP.scripts.utils.flags")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
-local apFlyaways = require("AP.scripts.ui.apFlyaways")
-local APFlags = require("AP.scripts.utils.flags")
-local TrapHandler = require("AP.scripts.traps.trapHandler")
+local COUNTDOWN = 16
+local DAMAGE    = 1
 
-local function timerTrap(ev)
-    local trapSuccess = false
+-- The countdown component keeps its own lifetime, so the trap holds no state.
+trapSystem.define({
+    name    = "TimerTrap",
+    flyaway = "Timer!",
+    apply   = function(ctx)
+        local entity = ctx.entity
+        if not entity.AP_damageCountdown then return false end
+        if entity.AP_damageCountdown.active then return end
 
-    for _, entity in ipairs(player.getPlayerEntities()) do
-        if not entity or not entity.playableCharacter then goto continue end
-        if not entity.AP_damageCountdown then goto continue end
-
-        if entity.AP_damageCountdown.active then
-            apFlyaways.addToFlyawayQueue({
-                entity = entity,
-            })
-            trapSuccess = true
-            goto continue
-        end
-
-        entity.AP_damageCountdown.countdown      = 16
-        entity.AP_damageCountdown.damage         = 3
-        entity.AP_damageCountdown.countdownReset = 16
+        entity.AP_damageCountdown.countdown      = COUNTDOWN
+        entity.AP_damageCountdown.damage         = DAMAGE
+        entity.AP_damageCountdown.countdownReset = COUNTDOWN
         entity.AP_damageCountdown.killerName     = "Timer Trap"
         entity.AP_damageCountdown.type           = APFlags.DAMAGE_AP_TRAP
         entity.AP_damageCountdown.active         = true
-
-        apFlyaways.addToFlyawayQueue({
-            entity = entity,
-        })
-
-        trapSuccess = true
-        ::continue::
-    end
-
-    return trapSuccess
-end
-
-TrapHandler.register("TimerTrap", timerTrap)
-
-return timerTrap
+    end,
+})

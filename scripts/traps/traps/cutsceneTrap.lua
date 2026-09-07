@@ -1,5 +1,4 @@
 local controls = require("necro.config.Controls")
-local currentLevel = require("necro.game.level.CurrentLevel")
 local cutscene = require("necro.client.Cutscene")
 local fileIO = require("system.game.FileIO")
 local music = require("necro.audio.Music")
@@ -8,15 +7,10 @@ local rng = require("necro.game.system.RNG")
 local settings = require("necro.config.Settings")
 local settingsStorage = require("necro.config.SettingsStorage")
 local stateControl = require("necro.client.StateControl")
-local turn = require("necro.cycles.Turn")
 
 local apFlyaways = require("AP.scripts.ui.apFlyaways")
 local apLog = require("AP.scripts.utils.log").apLog
-local apReplay = require("AP.scripts.utils.apReplay")
-local apUtils = require("AP.scripts.utils.apUtils")
-local TrapHandler = require("AP.scripts.traps.trapHandler")
-
-local REPLAY_KEY = "cutsceneTrap"
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
 local KNOWN_STORIES = {
     { character = "cadence",  index = 0 },
@@ -95,63 +89,58 @@ event.cutsceneEnd.add("APCutsceneTrapClearOverride", { order = "cutscene" }, fun
         settingsStorage.set("video.cutscene.displayModeStory", nil, settings.Layer.SCRIPT_OVERRIDE)
         stateControl.unpauseBeats()
         announce()
+        -- Frees the slot, so a queued Cutscene Trap can start its own screening.
+        trapSystem.stop("CutsceneTrap")
     end
 end)
 
-local function cutsceneTrap(ev, args, ticket)
-    local replayKey = REPLAY_KEY .. ":" .. tostring(ticket)
+-- One screening at a time, ended from cutsceneEnd rather than by a clock.
+trapSystem.define({
+    name     = "CutsceneTrap",
+    -- The announcement comes at the end, off the back of cutsceneEnd.
+    announce = trapSystem.Announce.NONE,
+    -- Video playback and a settings override; nothing here is simulated.
+    storage  = trapSystem.Storage.VOLATILE,
+    stateful = true,
+    guard    = function()
+        -- A cutscene from anywhere else still blocks this one.
+        return not cutscene.isActive()
+    end,
+    start    = function(ctx)
+        if storyPool == nil then
+            storyPool = buildStoryPool()
+        end
 
-    -- One screening at a time; the rest of the queue waits this one out. A replayed turn
-    -- has to reclaim the entry it already spent, which is what the ticket is for.
-    if trapCutsceneActive or cutscene.isActive() then
-        return apReplay.seen(replayKey)
-    end
+        if #storyPool == 0 then
+            cutscene.play({
+                type     = cutscene.Type.SPLASH,
+                image    = "ext/mainmenu/mainmenu.png",
+                duration = 5,
+            })
 
-    if not apReplay.firstThisTurn(replayKey) then return true end
+            -- No override to unwind and no pause to lift, so nothing to wait for.
+            announce()
+            trapSystem.stop("CutsceneTrap")
 
-    if storyPool == nil then
-        storyPool = buildStoryPool()
-    end
+            return true
+        end
 
-    local channel = apUtils.hashChannel(
-        "cutsceneTrap",
-        tostring(currentLevel.getSeed()),
-        tostring(turn.getCurrentTurnID())
-    )
-
-    if #storyPool > 0 then
-        local entry = rng.choice(storyPool, channel)
+        local entry = rng.choice(storyPool, ctx.channel)
         apLog(("Cutscene trap picked %s_%d of %d"):format(entry.character, entry.index, #storyPool))
 
-        local scene = {
-            type      = cutscene.Type.STORY,
-            character = entry.character,
-            index     = entry.index,
-        }
-        -- force story cutscenes on regardless of user display setting, matching built-in debug commands
-        settingsStorage.set("video.cutscene.displayModeStory", cutscene.DisplayMode.ALWAYS, settings.Layer.SCRIPT_OVERRIDE)
+        -- Forces story cutscenes on regardless of the user display setting.
+        settingsStorage.set("video.cutscene.displayModeStory",
+            cutscene.DisplayMode.ALWAYS, settings.Layer.SCRIPT_OVERRIDE)
         clearOverridePending = true
         trapCutsceneActive = true
 
-        cutscene.play(scene)
+        cutscene.play({
+            type      = cutscene.Type.STORY,
+            character = entry.character,
+            index     = entry.index,
+        })
         stateControl.pauseWithoutMenu()
 
-        -- The screening is this entry's whole job; cutsceneEnd announces it.
         return true
-    else
-        cutscene.play({
-            type     = cutscene.Type.SPLASH,
-            image    = "ext/mainmenu/mainmenu.png",
-            duration = 5,
-        })
-
-        -- No override to unwind and no pause to lift, so no cutsceneEnd work to wait for.
-        announce()
-
-        return true
-    end
-end
-
-TrapHandler.register("CutsceneTrap", cutsceneTrap)
-
-return cutsceneTrap
+    end,
+})

@@ -24,8 +24,7 @@ local FIELD_MAP = {
     unlocked_buff_items     = "unlockedBuffItems",
 }
 
--- Mod-owned during a session: Python's copy runs ahead and would dedupe away
--- items we have not applied. Both still arrive on the State packet.
+-- Mod-owned during a session; both still arrive on the State packet.
 local MOD_OWNED = {
     diamonds = true,
     received_items = true,
@@ -38,8 +37,7 @@ handlers.register("SaveUpdate", function(message)
             local value = message[snakeKey]
             if value ~= nil then
                 if camelKey == "characterLocations" then
-                    -- merge instead of replace: a zone beaten locally must not be reset
-                    -- to false by a stale Python reply that hasn't seen the check yet
+                    -- Merges rather than replaces, so a locally beaten zone survives a stale reply.
                     local existing = saveData.characterLocations or {}
                     for char, zones in pairs(value) do
                         existing[char] = existing[char] or {}
@@ -51,8 +49,7 @@ handlers.register("SaveUpdate", function(message)
                     end
                     saveData.characterLocations = existing
                 elseif camelKey == "extraModes" then
-                    -- merge instead of replace: an unlocked mode must not be reset
-                    -- to false by a stale Python reply that processed Items after us
+                    -- Merges rather than replaces, so an unlocked mode survives a stale reply.
                     local existing = saveData.extraModes or {}
                     for mode, v in pairs(value) do
                         if existing[mode] ~= true then

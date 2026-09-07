@@ -1,8 +1,8 @@
 local ecs = require "system.game.Entities"
 
 local apItemFactory = require("AP.scripts.items.apItemFactory")
-local makeSimpleTrap = (require "AP.scripts.traps.factories.makeSimpleTrap").makeSimpleTrap
 local trapHandler = require("AP.scripts.traps.trapHandler")
+local trapSystem = require("AP.scripts.traps.trapSystem")
 
 ---Halves every price on the floor, leaving AP shop slots alone.
 local function halvePrices()
@@ -29,12 +29,14 @@ local function halvePrices()
     return discounted > 0
 end
 
-trapHandler.register("APFireSale", makeSimpleTrap({
+trapSystem.define({
+    name  = "APFireSale",
     sound = "spellGold",
-    setup = function()
+    start = function()
         if not halvePrices() then return false end
+        return true
     end,
-}))
+})
 
 apItemFactory.define({
     name = "AP_FireSale",
