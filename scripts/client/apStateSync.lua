@@ -10,8 +10,6 @@ local progression = require("AP.scripts.client.progression")
 -- Host-only; the server replays the log to joiners.
 local AP_STATE = apClient.STATE_RESOURCE
 
-apClient.markStateSyncLoaded()
-
 local UPLOAD_INTERVAL = 20
 local ticksUntilUpload = 0
 

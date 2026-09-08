@@ -74,8 +74,11 @@ local hasStorage, storage = pcall(require, "system.file.Storage")
 ```
 
 If either is missing, [client.lua](scripts/client/client.lua) installs no-op stubs, warns
-in chat, and the Archipelago trapdoor stays closed. `necro.*` modules never need the
-guard. `system.mod.ModLoader` and `necro.mod.Mods` are **not reachable at all** — detect
+in chat, and the Archipelago trapdoor stays closed. That stub list is hand-maintained and
+sits behind an early `return`, so **any `apClient` member defined below it does not exist
+in degraded mode** — touching one at module scope crashes the whole mod at load rather
+than degrading. A field the literal sets to `nil` is absent for this purpose too.
+`necro.*` modules never need the guard. `system.mod.ModLoader` and `necro.mod.Mods` are **not reachable at all** — detect
 other mods via `resources.getData(netplay.Resource.MOD_LIST)`
 (see [modConflict.lua](scripts/utils/modConflict.lua) and
 [version.lua](scripts/utils/version.lua)).
@@ -243,6 +246,7 @@ scripts/
   level/                     lobby + run generation, item generation, extras rooms, modes
   modes/                     APAllZones, APSingleZone, APEnsemble, APBossRush game modes
   buffs/                     per-character permanent run buffs
+  audio/                     apSongRandomizer.lua (song + artist shuffle over musicTrack)
   ui/                        flyaway queue, chat badge, HUDs, trap status, outlines
   utils/                     characters, items, inventory, level gen, colors, log, version
   weapons/ tile/ menu/       supporting content
@@ -390,6 +394,13 @@ The mod is host-authoritative: only the host holds the TCP socket to the Python 
   the payload inside the action, so no client acts on data it has not received.
 - `apUtils.isNetworked()` is `not singlePlayer.isActive()` — the switch between the
   networked and local delivery paths.
+- **Joiners inherit the host's gameplay content.** DLC load status, mods, custom rules,
+  extra modes and feature packs all follow the host, and a player must own every *active*
+  DLC to join at all. So anything gated on `gameDLC.isAmplifiedLoaded()` is safe to assume
+  identical across a session. Audio and graphics settings stay per-player.
+  An owned DLC the host does not have stays unloaded, so runtime availability checks such
+  as `soundtrack.isArtistAvailable` agree across a session — which is why they invalidate
+  on `dlcStatusChange` rather than being resolved once.
 
 ---
 
@@ -433,6 +444,7 @@ CotND (this mod) ──JSON/TCP──> CotNDServer ──> CotNDContext ──We
 | `Trap` | trap.lua | Incoming TrapLink: `trap_name` + `args` |
 | `Chat` | chat.lua | Server message into game chat |
 | `SetDeathLink` / `SetTrapLink` / `SetDiamonds` | respective files | Server-driven toggles |
+| `SetSongRandomizer` | setSongRandomizer.lua | `song_randomizer` mode string + `randomize_artists` |
 | `Disconnected` | disconnected.lua | AP server dropped |
 
 ### Authority split
@@ -498,6 +510,15 @@ rather than testing mode ids by hand.
   the post-fight exit, but only after `bossFightEnd` builds the corridor.
 - **Flyaways split by turn context.** Inside a turn they are replicated snapshot state;
   outside they are render-only.
+- **A song ending is a turn action, not presentation.** `SongEnd.lua` pushes
+  `action.System.SONG_ENDED` into the client action buffer when the beatmap runs out.
+  `boss_7` is the only non-looping track, and that length is Return of the NecroDancer's
+  time limit — so any code that moves tracks around must force `loop = true`.
+- **`event.musicTrack` at `order = "customMusic"` is the soundtrack seam.** It fires before
+  the `zone`/`boss`/`special` handlers build filenames, so rewriting
+  `ev.type/zone/floor/boss/artist` there carries beatmaps, layers, vocals and volumes with
+  it. It does not touch `currentLevel.getMusic()`, which is what NecroDancer's phase 2
+  gates on — see `apNecroDancerPhase2`.
 - **Weapon shapes:** `customWeapons.registerShape` refuses `xmlTypes` from a mod, but
   stamping `weaponType` + the shape component + `weaponMaterial`/`weaponMaterialBase` via
   `entitySchemaLoadNamedEntity` achieves the same thing. See

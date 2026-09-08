@@ -1,3 +1,4 @@
+local boss = require("necro.game.level.Boss")
 local currentLevel = require("necro.game.level.CurrentLevel")
 local gameSession = require "necro.client.GameSession"
 local instantReplay = require "necro.client.replay.InstantReplay"
@@ -13,6 +14,18 @@ local apClient = require("AP.scripts.client.client")
 local apFlags = require("AP.scripts.utils.flags")
 local apUtils = require("AP.scripts.utils.apUtils")
 local progression = require("AP.scripts.client.progression")
+
+local apLevelGeneration = {}
+
+-- Fortissimole is the only boss Amplified adds that is not a story boss, so it is the only
+-- one proceduralRun's pool can hand to a slot that excluded Amplified.
+local AMPLIFIED_BOSSES = {
+    [boss.Type.FORTISSIMOLE] = true,
+}
+
+function apLevelGeneration.isBossExcluded(bossType)
+    return AMPLIFIED_BOSSES[bossType] == true and not progression.isDLCEnabled("Amplified")
+end
 
 event.levelSequenceUpdate.add("apRemoveZone5", { order = "initAllZones", sequence = 0 }, function(ev)
     if (ev.mode.id ~= "APAllZones" and ev.mode.id ~= "APEnsemble" and ev.mode.id ~= "APBossRush") or progression.isDLCEnabled("Amplified") then
@@ -34,6 +47,42 @@ event.levelSequenceUpdate.add("apRemoveZone5", { order = "initAllZones", sequenc
         end
     end
     ev.sequence = newSeq
+end)
+
+local function replacementBoss(used)
+    local repeated
+
+    for _, candidate in ipairs(proceduralRun.getBossPool()) do
+        if not AMPLIFIED_BOSSES[candidate] then
+            if not used[candidate] then return candidate end
+            repeated = repeated or candidate
+        end
+    end
+
+    return repeated
+end
+
+-- proceduralRun's pool follows the installed game rather than the slot, so dropping zone 5
+-- is not enough: an Amplified boss can still have been dealt to zones 1 through 4.
+event.levelSequenceUpdate.add("apReplaceAmplifiedBosses", { order = "bossRush", sequence = -1 }, function(ev)
+    if not apUtils.isAPMode(ev.mode.id) or progression.isDLCEnabled("Amplified") then return end
+
+    local used = {}
+    for _, entry in ipairs(ev.sequence) do
+        if entry.boss then
+            used[entry.boss] = true
+        end
+    end
+
+    for _, entry in ipairs(ev.sequence) do
+        if AMPLIFIED_BOSSES[entry.boss] then
+            local replacement = replacementBoss(used)
+            if replacement then
+                used[replacement] = true
+                entry.boss = replacement
+            end
+        end
+    end
 end)
 
 event.levelSequenceUpdate.add("apFilterAccessibleZones", { order = "initAllZones", sequence = 1 }, function(ev)
@@ -167,3 +216,5 @@ event.tick.add("apConnectionLostMidrun", "periodicCheck", function()
     stateControl.pause()
     menu.open("Archipelago_MidRun_Connect")
 end)
+
+return apLevelGeneration

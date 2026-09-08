@@ -185,11 +185,6 @@ function apClient.sendDeathlink(message)
     })
 end
 
-local stateSyncLoaded = false
-function apClient.markStateSyncLoaded()
-    stateSyncLoaded = true
-end
-
 event.tick.add("initClientPort", { order = "lobby", sequence = 1 }, function(ev)
     if hasStorage and (apClient.port == 0 or (not apClient.isConnected())) then
         local storedPort = tonumber(apFolder.readFile("port.txt"))

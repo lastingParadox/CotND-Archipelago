@@ -11,6 +11,7 @@ local rng = require "necro.game.system.RNG"
 
 local apBossRushShop = require("AP.scripts.level.apBossRushShop")
 local apCharacters = require("AP.scripts.utils.apCharacters")
+local apLevelGeneration = require("AP.scripts.level.apLevelGeneration")
 local progression = require("AP.scripts.client.progression")
 
 gameSession.Mode.extend(
@@ -98,7 +99,7 @@ end
 
 local function unusedZoneBoss(used, zone)
     for _, bossType in ipairs(proceduralRun.getBossPool()) do
-        if not used[slotKey(bossType, zone)] then
+        if not apLevelGeneration.isBossExcluded(bossType) and not used[slotKey(bossType, zone)] then
             return bossType
         end
     end

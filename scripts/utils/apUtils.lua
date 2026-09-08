@@ -12,13 +12,24 @@ apUtils.isNetworked = function()
     return not singlePlayer.isActive()
 end
 
+local AP_MODES = {
+    APAllZones = true,
+    APSingleZone = true,
+    APHintMode = true,
+    APEnsemble = true,
+    APBossRush = true,
+}
+
+-- For the mode a run is being generated for, which is not yet the current one.
+apUtils.isAPMode = function(modeID)
+    return AP_MODES[modeID] == true
+end
+
 apUtils.isAPContext = function(entity)
     if gameState.isInLobby() then
         return entity ~= nil and apLobby.isInLobby(entity)
     end
-    local mode = gameSession.getCurrentMode().id
-    return mode == "APAllZones" or mode == "APSingleZone" or mode == "APHintMode"
-        or mode == "APEnsemble" or mode == "APBossRush"
+    return apUtils.isAPMode(gameSession.getCurrentMode().id)
 end
 
 ---@return userdata channel
