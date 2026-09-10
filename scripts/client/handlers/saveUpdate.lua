@@ -1,3 +1,6 @@
+local currentLevel = require "necro.game.level.CurrentLevel"
+local visualUpdate = require "necro.cycles.VisualUpdate"
+
 local apStorage = require("AP.scripts.client.storage")
 local handlers = require("AP.scripts.client.initHandlers")
 
@@ -63,6 +66,8 @@ handlers.register("SaveUpdate", function(message)
             end
         end
     end
+
+    if currentLevel.isLobby() then visualUpdate.trigger() end
 end)
 
 return { FIELD_MAP = FIELD_MAP }

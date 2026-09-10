@@ -12,8 +12,9 @@ apGrants.define({
     item = "PermHeart2",
     apply = function(_, _, ctx)
         for _, playerEntity in ipairs(ctx.players) do
-            -- A one-heart character stays on one heart; the total still banks.
-            if playerEntity and playerEntity.healthLimit.limit ~= 1 then
+            local limit = playerEntity and playerEntity.healthLimit
+
+            if limit and limit.limit ~= 1 then
                 playerEntity.health.health = playerEntity.health.health + 2
                 playerEntity.health.maxHealth = playerEntity.health.maxHealth + 2
             end

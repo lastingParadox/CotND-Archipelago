@@ -57,7 +57,7 @@ local function shouldGrantUniqueStarterItems(progression)
         return true
     end
 
-    return progression.getCharacterUnlocks() == 0
+    return progression.getCharacterUnlocks() == "item_only"
 end
 
 local function isUniqueStarterAllowed(entity, itemType, progression)
@@ -338,7 +338,7 @@ function apInventory.applyStarterInventory(entity, progression, options)
         apInventory.sanitizeLobbyInventory(entity, progression)
     end
 
-    local isSoftUnlocks = progression and progression.getCharacterUnlocks() == 1
+    local isSoftUnlocks = progression and progression.getCharacterUnlocks() == "required_items_soft"
 
     if isSoftUnlocks then
         -- Soft mode: starting inventory is gated on received AP items.

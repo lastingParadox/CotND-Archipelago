@@ -66,7 +66,6 @@ event.turn.override("followerDamageParentWhileDead", function(func)
     end
 end)
 
--- Remove Marvs at level/zone transitions
 function apFollowerChain.clearChain(entity)
     local link = nextLink(entity)
 
@@ -76,6 +75,14 @@ function apFollowerChain.clearChain(entity)
         link = following
     end
 end
+
+event.objectCharacterSwitchFrom.add("apClearFollowerChain", {
+    filter = "characterWithFollower",
+    order = "follower",
+    sequence = -1,
+}, function(ev)
+    apFollowerChain.clearChain(ev.entity)
+end)
 
 event.gameStateLevel.add("apRemoveDeathlinkChain", "damageCountdown", function()
     for entity in ecs.entitiesWithComponents({ "AP_followerDamageParentWhileDead" }) do

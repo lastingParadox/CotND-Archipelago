@@ -138,6 +138,7 @@ event.objectCharacterSwitchTo.add("apRemoveLockedInitialItems", {
     sequence = 1,
 }, function(ev)
     if not ev.entity.playableCharacter or not apUtils.isAPContext(ev.entity) then return end
+    if gameSession.getCurrentMode().id == "APEnsemble" then return end
 
     for _, item in ipairs(inventory.getItems(ev.entity)) do
         if item.itemInitial and item.itemInitial.active

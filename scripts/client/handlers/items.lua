@@ -251,7 +251,12 @@ event.tick.add("apProcessQueuedItems", { order = "lobby", sequence = 3 }, functi
     if canProcessItems() then
         apLog("Handling item acquisition for " .. #defferredItems .. " items")
         for _, entry in ipairs(defferredItems) do
-            handleItemAcquisition(entry.item, entry.silent)
+            -- A grant that throws must not strand the queue, or it reannounces every tick.
+            local ok, err = pcall(handleItemAcquisition, entry.item, entry.silent)
+            if not ok then
+                apLog(("Failed to grant %s: %s")
+                    :format(tostring(entry.item and entry.item.item), tostring(err)), "error")
+            end
         end
         defferredItems = {}
         visualUpdate.trigger()

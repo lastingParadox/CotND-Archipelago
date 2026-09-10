@@ -29,7 +29,7 @@ local function attach(progression)
         local accessible = {}
 
         if mode == "progressive" then
-            local unlocked = startingZone + progression.getProgressiveZoneAccessCount()
+            local unlocked = 1 + progression.getProgressiveZoneAccessCount()
 
             for i = 1, math.min(unlocked, #zoneList) do
                 accessible[#accessible + 1] = zoneList[i]
@@ -70,17 +70,6 @@ local function attach(progression)
         return access[tostring(zone)] == true
     end
 
-    -- Every copy counts, precollected included, so zone 1 is the base.
-    function progression.addProgressiveZoneAccess()
-        local access = apStorage.saveData.zoneAccess
-        if not access then
-            apStorage.saveData.zoneAccess = {}
-            access = apStorage.saveData.zoneAccess
-        end
-        access.progressiveCount = (access.progressiveCount or 0) + 1
-    end
-
-    -- Progressive mode: number of "Progressive Zone Access" copies held.
     function progression.getProgressiveZoneAccessCount()
         local access = apStorage.saveData.zoneAccess or {}
         return access.progressiveCount or 0

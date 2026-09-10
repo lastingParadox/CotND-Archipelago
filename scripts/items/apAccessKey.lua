@@ -10,11 +10,7 @@ end
 
 local function unlockZone(zone)
     return function()
-        if zone > 0 then
-            progression.addZoneAccess(zone)
-        else
-            progression.addProgressiveZoneAccess()
-        end
+        if zone > 0 then progression.addZoneAccess(zone) end
 
         refreshLobby()
     end

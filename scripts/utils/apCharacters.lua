@@ -195,7 +195,9 @@ function apCharacters.setAPHealth(entity)
     if (entity == nil) then return end
 
     local proto = ecs.getEntityPrototype(entity.name)
-    if (proto == nil or proto.healthLimit.limit == 1) then return end
+    -- No healthLimit means this is not a character sheet at all, such as a possessed enemy.
+    local limit = proto and proto.healthLimit
+    if not limit or limit.limit == 1 then return end
 
     local apHealth = progression.getBuffHealth()
 
