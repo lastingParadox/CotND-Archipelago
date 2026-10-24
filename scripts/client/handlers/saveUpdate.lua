@@ -10,7 +10,6 @@ local FIELD_MAP = {
     shop_locations          = "shopLocations",
     codex_locations         = "codexLocations",
     chest_locations         = "chestLocations",
-    unlocked_npcs           = "unlockedNPCs",
     received_items          = "receivedItems",
     shop_consumed_locations = "shopConsumedLocations",
     health                  = "health",

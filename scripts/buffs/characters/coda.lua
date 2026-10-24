@@ -1,7 +1,4 @@
-local currentLevel = require "necro.game.level.CurrentLevel"
-local hud          = require "necro.render.hud.HUD"
-local ui           = require "necro.render.UI"
-
+local apDamageCountdownHUD = require "AP.scripts.ui.apDamageCountdown"
 local apFlyaways  = require "AP.scripts.ui.apFlyaways"
 local apUtils     = require "AP.scripts.utils.apUtils"
 local progression = require "AP.scripts.client.progression"
@@ -44,22 +41,11 @@ event.objectTakeDamage.add("apCodaBuffStrike", {
     end
 end)
 
-event.renderPlayerHUD.add("apCodaBuffCountdownHUD", {
-    filter   = "AP_damageCountdown",
-    order    = "damageCountdown",
-    sequence = 1,
-}, function(entity)
+apDamageCountdownHUD.register(function(entity)
     if not isCodaBuff() or entity.name ~= "Coda" then return end
-    if currentLevel.isSafe() then return end
+
     local remaining = MAX_STRIKES - (codaStrikes[entity.id] or 0)
-    if remaining <= 0 then return end
-    hud.drawText({
-        alignX  = 0.5,
-        alignY  = 1,
-        element = "damageCountdown",
-        text    = tostring(remaining),
-        font    = ui.Font.MEDIUM,
-    })
+    if remaining > 0 then return { value = remaining, beats = false } end
 end)
 
 function coda.apply() end

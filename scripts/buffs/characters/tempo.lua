@@ -4,6 +4,7 @@ local hud         = require "necro.render.hud.HUD"
 local kill        = require "necro.game.character.Kill"
 local ui          = require "necro.render.UI"
 
+local apDamageCountdownHUD = require("AP.scripts.ui.apDamageCountdown")
 local apUtils     = require("AP.scripts.utils.apUtils")
 local progression = require("AP.scripts.client.progression")
 
@@ -79,13 +80,28 @@ event.itemConsume.override("resetDamageCountdown", function(func, ev)
     end
 end)
 
+local function shownCountdown(entity)
+    local countdown = entity.damageCountdown
+    local limit = isTempoWithBuff(entity) and BUFF_COUNTDOWN or countdown.countdownReset - 1
+
+    return math.min(countdown.countdown, limit)
+end
+
+apDamageCountdownHUD.register(function(entity)
+    if entity.damageCountdown then
+        return { value = shownCountdown(entity), native = true }
+    end
+end)
+
 event.renderPlayerHUD.override("damageCountdown", function(func, entity)
+    if apDamageCountdownHUD.ownsSlot(entity) then return end
+
     if isTempoWithBuff(entity) and entity.damageCountdown and not currentLevel.isSafe() then
         hud.drawText({
             alignX = 0.5,
             alignY = 1,
             element = "damageCountdown",
-            text = tostring(math.min(entity.damageCountdown.countdown, BUFF_COUNTDOWN)),
+            text = tostring(shownCountdown(entity)),
             font = ui.Font.MEDIUM,
         })
     else

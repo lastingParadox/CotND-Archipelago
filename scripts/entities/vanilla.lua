@@ -36,6 +36,11 @@ event.entitySchemaLoadNamedEntity.add("apTriggerOpenMenuComponents", { key = "Tr
     ev.entity.AP_trapUnlock = {}
 end)
 
+event.entitySchemaLoadNamedEntity.add("apSongRandomizerShrineHint", { key = "CustomArtists_SongRandomizerShrine" },
+    function(ev)
+        ev.entity.shrineHintLabel = { text = "Song Randomizer", visible = false }
+    end)
+
 -- Items
 local function addAPItemComponents(entity)
     entity.AP_hintLabel = {}
@@ -85,9 +90,9 @@ local containers = {
 }
 
 local chestUpgrades = {
-    AddchestRed   = { chest = "ChestRed",    order = 1 },
+    AddchestRed   = { chest = "ChestRed", order = 1 },
     AddchestWhite = { chest = "ChestPurple", order = 2 },
-    AddchestBlack = { chest = "ChestBlack",  order = 3 },
+    AddchestBlack = { chest = "ChestBlack", order = 3 },
 }
 
 event.entitySchemaLoadEntity.add("apChestSchema", { order = "overrides", sequence = 2 }, function(ev)
@@ -141,6 +146,7 @@ event.entitySchemaLoadEntity.add("playerAPItem", { order = "overrides", sequence
         e.itemSlot = { name = "misc" }
         e.inventoryCursedSlots = e.inventoryCursedSlots or {}
         e.AP_damageCountdown = {}
+        e.AP_timerCountdown = {}
 
         e.rotatedSprite = e.rotatedSprite or {}
 
@@ -435,7 +441,7 @@ end)
 
 -- Marv
 
-event.entitySchemaLoadNamedEntity.add("apMarv", { order = "overrides", sequence = 1, key = "Marv" }, function (ev)
+event.entitySchemaLoadNamedEntity.add("apMarv", { order = "overrides", sequence = 1, key = "Marv" }, function(ev)
     ev.entity.inventory = {}
     ev.entity.itemUser = {}
     ev.entity.itemCollector = {}
@@ -447,7 +453,8 @@ end)
 
 -- Miku Resonance Spell
 
-event.entitySchemaLoadNamedEntity.add("apSpellcastResonance", { order = "overrides", sequence = 2, key = "Coldsteel_SpellResonance"}, function (ev)
+event.entitySchemaLoadNamedEntity.add("apSpellcastResonance",
+    { order = "overrides", sequence = 2, key = "Coldsteel_SpellResonance" }, function(ev)
     ev.entity.Coldsteel_spellCooldownStack = {
         cooldown = 7,
         remainingKills = 7,
@@ -456,22 +463,30 @@ event.entitySchemaLoadNamedEntity.add("apSpellcastResonance", { order = "overrid
         cooldown = 4,
         text = "%s combo",
     }
-
 end)
 
-event.holderKill.override("Coldsteel_reduceSpellCooldown", function (func, ev)
-    if ev.holder.AP_spellResonanceMode and ev.holder.AP_spellResonanceMode.type == "combo" then return
-    else return func(ev) end
+event.holderKill.override("Coldsteel_reduceSpellCooldown", function(func, ev)
+    if ev.holder.AP_spellResonanceMode and ev.holder.AP_spellResonanceMode.type == "combo" then
+        return
+    else
+        return func(ev)
+    end
 end)
 
-event.spellItemCooldown.override("Coldsteel_stack", function (func, ev)
+event.spellItemCooldown.override("Coldsteel_stack", function(func, ev)
     local holder = ecs.getEntityByID(ev.entity.item and ev.entity.item.holder)
-    if holder and holder.AP_spellResonanceMode and holder.AP_spellResonanceMode.type == "combo" then return
-    else return func(ev) end
+    if holder and holder.AP_spellResonanceMode and holder.AP_spellResonanceMode.type == "combo" then
+        return
+    else
+        return func(ev)
+    end
 end)
 
-event.spellItemCooldown.override("Coldsteel_visual", function (func, ev)
+event.spellItemCooldown.override("Coldsteel_visual", function(func, ev)
     local holder = ecs.getEntityByID(ev.entity.item and ev.entity.item.holder)
-    if holder and holder.AP_spellResonanceMode and holder.AP_spellResonanceMode.type == "kills" then return
-    else return func(ev) end
+    if holder and holder.AP_spellResonanceMode and holder.AP_spellResonanceMode.type == "kills" then
+        return
+    else
+        return func(ev)
+    end
 end)

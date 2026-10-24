@@ -1,14 +1,13 @@
 local makeSummonTrap = (require "AP.scripts.traps.factories.makeSummonTrap").makeSummonTrap
 
--- No aggro, no stair lock: a crowd of shopkeepers turns up and sings over each other.
 makeSummonTrap({
     name          = "FreddyTrap",
     flyawayText   = "Freddy Trap!",
-    sound         = "shopkeeperCry",
+    sound         = "shopkeeperDeath",
     min           = 1,
-    max           = 1,
+    max           = 3,
     radius        = 4,
-    variants      = { Shopkeeper = 4, Shopkeeper2 = 1, Shopkeeper3 = 1, Shopkeeper4 = 1 },
+    variants      = { Shopkeeper = 2, AP_ShopkeeperAlt = 1, AP_ShopkeeperMonstrous = 1 },
     spawnProps    = false,
     particles     = false,
     checkGrabbed  = false,

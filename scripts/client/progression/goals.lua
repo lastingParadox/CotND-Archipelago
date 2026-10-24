@@ -103,7 +103,7 @@ local function attach(progression)
             -- Same table the boss-check sender uses, so the two cannot drift.
             for _, entry in pairs(progression.specialBosses or {}) do
                 for character in pairs(entry.characters) do
-                    local locations = characterLocations[character]
+                    local locations = not progression.getCharacterBlacklist(character) and characterLocations[character]
                     if locations and locations[entry.name] == true then
                         beaten = beaten + 1
                     end

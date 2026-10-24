@@ -16,6 +16,9 @@ apTrapQueue = snapshot.variable({}, true) -- { { ticket = 4, name = "MonkeyTrap"
 -- Rewound with the queue, so a replayed turn re-issues the ticket it issued the first time.
 apTrapTicket = snapshot.variable(0)
 
+-- The turn each kind of trap last landed on, so a second of a kind waits for the next beat.
+apTrapLastTurn = snapshot.variable({}, true)
+
 local TrapHandler = {
     traps = {},
 }
@@ -26,6 +29,27 @@ end)
 -- Called by each trap file during `require`
 function TrapHandler.register(name, fn)
     TrapHandler.traps[name] = fn
+end
+
+-- True from the moment any player takes the stairs until they arrive on the next floor.
+local function isAnyoneDescending()
+    for _, entity in ipairs(player.getPlayerEntities()) do
+        if entity.descent and entity.descent.active then return true end
+    end
+
+    return false
+end
+
+local function landedThisTurn(name)
+    return apTrapLastTurn[name] == turn.getCurrentTurnID()
+end
+
+-- Runs the effect, and records the turn if it landed.
+local function land(name, effect, ev, args, ticket)
+    if not effect(ev, args, ticket) then return false end
+
+    apTrapLastTurn[name] = turn.getCurrentTurnID()
+    return true
 end
 
 -- Identifies one trap for as long as it is owed.
@@ -58,7 +82,8 @@ function TrapHandler.fire(name, args, opts)
     local ticket = nextTicket()
 
     -- Only inside a turn; anything arriving on a tick waits for the next one.
-    if opts.ev and effect and apUtils.isAPContext() and effect(opts.ev, args, ticket) then
+    if opts.ev and effect and apUtils.isAPContext() and not isAnyoneDescending()
+        and not landedThisTurn(name) and land(name, effect, opts.ev, args, ticket) then
         visualUpdate.trigger()
         return
     end
@@ -103,7 +128,7 @@ end
 
 -- Master turn event
 event.turn.add("TrapHandlerRunner", { order = "playerActions", sequence = -1 }, function(ev)
-    if gameState.isInLobby() or not apUtils.isAPContext() then return end
+    if gameState.isInLobby() or not apUtils.isAPContext() or isAnyoneDescending() then return end
 
     for i = #apTrapQueue, 1, -1 do
         local entry = apTrapQueue[i]
@@ -111,10 +136,10 @@ event.turn.add("TrapHandlerRunner", { order = "playerActions", sequence = -1 }, 
         if type(entry) == "string" then entry = { name = entry } end
         local trapFn = TrapHandler.traps[entry.name]
 
-        if trapFn and trapFn(ev, entry.args, entry.ticket) then
-            apLog("Handling ".. entry.name .. " trap!")
+        if not trapFn then
             table.remove(apTrapQueue, i)
-        elseif not trapFn then
+        elseif not landedThisTurn(entry.name) and land(entry.name, trapFn, ev, entry.args, entry.ticket) then
+            apLog("Handling ".. entry.name .. " trap!")
             table.remove(apTrapQueue, i)
         end
     end

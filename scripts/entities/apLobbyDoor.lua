@@ -72,14 +72,14 @@ event.objectSpawn.add("apLabelDoorNPC", { filter = "AP_progressionDoor", order =
 end)
 
 local function isUnlocked(entity)
-    local unlockedNPCs = progression.getUnlockedNPCs()
+    local cagedNPCs = progression.getCagedNPCs()
     local items = progression.getItems()
-    if not (unlockedNPCs and items) then return false end
+    if not (cagedNPCs and items) then return false end
 
     local unlocked = true
 
     for _, npc in ipairs(entity.AP_progressionDoor.npc) do
-        local npcData = unlockedNPCs[apCharacters.cotNDNPCToAPLocation(npc)]
+        local npcData = cagedNPCs[apCharacters.cotNDNPCToAPLocation(npc)]
         local npcItem = items[npc]
 
         -- Nil NPCData: Not in the locations list, so door's going to be unlocked.
@@ -142,7 +142,7 @@ local function lockedDoorState(entity, announce)
     local swipeType = ""
 
     for _, npc in ipairs(entity.AP_progressionDoor.npc) do
-        local npcData = progression.getUnlockedNPCs(apCharacters.cotNDNPCToAPLocation(npc))
+        local npcData = progression.getCagedNPCs(apCharacters.cotNDNPCToAPLocation(npc))
         local npcItem = progression.getItems(npc)
         if not npcItem then
             -- Check for scouted hint location data first.
@@ -173,7 +173,7 @@ local function lockedDoorState(entity, announce)
                 end
             else
                 -- No hint data yet; fall back to original messages.
-                if not npcData.unlocked then
+                if not npcData.freed then
                     errorString = "Free me in " ..
                         tostring(npcData.zone) .. "-" .. tostring(npcData.level) .. "!"
                     swipeType = npcData.unlockType == "Glass" and "glassKey" or "goldKey"

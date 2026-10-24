@@ -17,7 +17,7 @@ function apStorage.ensureSaveDataTables()
         bannedItems = {},
         nextRunItems = {},
         characterLocations = {},
-        unlockedNPCs = {},
+        cagedNPCs = {},
         locationHints = {},
         npcHintLocations = {},
         buffs = {},

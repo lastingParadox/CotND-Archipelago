@@ -27,7 +27,6 @@ end
 
 local function isCharacterDisabled(apName)
     local requirement = apCharacters.characterRequirements[apName]
-    if progression.getCharacterBlacklist(apName) then return true end
     if requirement and requirement ~= "None" and not progression.isDLCEnabled(requirement) then return true end
     return false
 end
@@ -123,6 +122,7 @@ event.render.add("buffCharacterShrinePreview", { order = "characterPreview", seq
                     local isActive = entity.shrine and entity.shrine.active
                     local disabled = isCharacterDisabled(charName)
                     local locked = disabled or isCharacterLocked(charName)
+                    local blacklisted = progression.getCharacterBlacklist(charName)
                     local dimmed = not isActive or locked
 
                     apPreview.draw(preview, {
@@ -130,9 +130,9 @@ event.render.add("buffCharacterShrinePreview", { order = "characterPreview", seq
                         offsetY = -11,
                         offsetZ = 100,
                         silhouette = locked,
-                        grayscale = not locked and not isActive,
+                        grayscale = not locked and (not isActive or blacklisted),
                         underlay = locked and "AP_BuffCharacterShrine" or nil,
-                        indicatorColor = apPreview.indicatorColor(disabled, false),
+                        indicatorColor = apPreview.indicatorColor(disabled or blacklisted, false),
                         animationSpeed = dimmed and 0 or nil,
                         previewArgs = {
                             AP_noHover = dimmed,

@@ -2,8 +2,11 @@ local currentLevel = require("necro.game.level.CurrentLevel")
 local damage = require("necro.game.system.Damage")
 local flyaway = require("necro.game.system.Flyaway")
 local gameDLC = require "necro.game.data.resource.GameDLC"
+local kill = require "necro.game.character.Kill"
 local sound = require("necro.audio.Sound")
 local ecs = require("system.game.Entities")
+
+local apFlags = require("AP.scripts.utils.flags")
 
 local damageCountdownFlyaways = {
     texts = {
@@ -59,55 +62,94 @@ local function getDamageCountdownSound(entity, countdown)
     return fallbackSounds[countdown]
 end
 
-event.turn.add("apReduceDamageCountdown", "damageCountdown", function(ev)
-    for entity in ecs.entitiesWithComponents({
-        "AP_damageCountdown"
-    }) do
-        if entity.gameObject.active and entity.AP_damageCountdown.active and (not entity.descent or not entity.descent.active) and (not entity.grooveChainImmunity or not entity.grooveChainImmunity.idle) and not currentLevel.isSafe() then
-            local countdown = entity.AP_damageCountdown.countdown
-            entity.AP_damageCountdown.countdown = countdown - 1
+-- DeathLink's countdown and the Timer Trap's, run side by side.
+local COUNTDOWNS = { "AP_damageCountdown", "AP_timerCountdown" }
 
-            if countdown <= 0 then
-                damage.inflict({
-                    type = entity.AP_damageCountdown.type,
-                    damage = entity.AP_damageCountdown.damage,
-                    killerName = entity.AP_damageCountdown.killerName,
-                    victim = entity
-                })
+local FIELDS = { "countdown", "countdownReset", "damage", "killerName", "type" }
 
-                entity.AP_damageCountdown.countdown = entity.AP_damageCountdown.countdownReset
-            end
+local function ticks(entity, countdown)
+    return entity.gameObject.active and countdown.active
+        and (not entity.descent or not entity.descent.active)
+        and (not entity.grooveChainImmunity or not entity.grooveChainImmunity.idle)
+end
 
-            local text = damageCountdownFlyaways.texts[countdown]
+local function tick(entity, countdown)
+    local remaining = countdown.countdown
+    countdown.countdown = remaining - 1
 
-            if text then
-                flyaway.create({ entity = entity, text = text })
-            end
+    if remaining <= 0 then
+        local possessor = entity.Sync_possessable and ecs.getEntityByID(entity.Sync_possessable.possessor)
 
-            local soundEntry = getDamageCountdownSound(entity, countdown)
+        damage.inflict({
+            type = countdown.type,
+            damage = countdown.damage,
+            killerName = countdown.killerName,
+            victim = entity
+        })
 
-            if soundEntry then
-                sound.playIfFocused(soundEntry, entity)
+        -- A DeathLink run out on a possessed body takes Chaunter with it.
+        if possessor and countdown.type == apFlags.DAMAGE_DEATH_LINK then
+            damage.inflict({
+                type = countdown.type,
+                damage = countdown.damage,
+                killerName = countdown.killerName,
+                victim = possessor
+            })
+        end
+
+        countdown.countdown = countdown.countdownReset
+    end
+
+    local text = damageCountdownFlyaways.texts[remaining]
+
+    if text then
+        flyaway.create({ entity = entity, text = text })
+    end
+
+    local soundEntry = getDamageCountdownSound(entity, remaining)
+
+    if soundEntry then
+        sound.playIfFocused(soundEntry, entity)
+    end
+end
+
+event.turn.add("apReduceDamageCountdown", "damageCountdown", function()
+    if currentLevel.isSafe() then return end
+
+    for _, component in ipairs(COUNTDOWNS) do
+        for entity in ecs.entitiesWithComponents({ component }) do
+            local countdown = entity[component]
+
+            if ticks(entity, countdown) then
+                tick(entity, countdown)
             end
         end
     end
 end)
-event.gameStateLevel.add("apRemoveDamageCountdown", "damageCountdown", function(ev)
-    for entity in ecs.entitiesWithComponents({
-        "AP_damageCountdown"
-    }) do
-        entity.AP_damageCountdown.active = false
-        entity.AP_damageCountdown.countdown = 24
-        entity.AP_damageCountdown.killerName = "DeathLink"
+
+event.objectKill.add("apResetTimerCountdownOnKill", { filter = "AP_timerCountdown", order = "damageCountdown" },
+    function(ev)
+        local countdown = ev.entity.AP_timerCountdown
+
+        if countdown.active and kill.Credit.check(ev.credit, kill.Credit.DAMAGE_COUNTDOWN) then
+            countdown.countdown = countdown.countdownReset
+        end
+    end)
+
+event.gameStateLevel.add("apRemoveDamageCountdown", "damageCountdown", function()
+    for _, component in ipairs(COUNTDOWNS) do
+        for entity in ecs.entitiesWithComponents({ component }) do
+            entity[component].active = false
+        end
     end
 end)
-
-
 
 event.entitySchemaLoadEntity.add("apDamageCountdownOnControllable", { order = "overrides", sequence = 2 },
     function(ev)
         if ev.entity.controllable then
-            ev.entity.AP_damageCountdown = ev.entity.AP_damageCountdown or {}
+            for _, component in ipairs(COUNTDOWNS) do
+                ev.entity[component] = ev.entity[component] or {}
+            end
         end
     end)
 
@@ -115,19 +157,15 @@ local carried = {}
 
 event.objectControllerChanged.add("apCarryDamageCountdown", { order = "player", sequence = -1 },
     function(ev)
-        local countdown = ev.entity.AP_damageCountdown
-
-        -- Arriving in a new body: pick the countdown back up.
+        -- Arriving in a new body: pick the countdowns back up.
         if ev.playerID then
-            local saved = carried[ev.playerID]
+            for component, saved in pairs(carried[ev.playerID] or {}) do
+                local countdown = ev.entity[component]
 
-            if saved and countdown then
-                countdown.active         = true
-                countdown.countdown      = saved.countdown
-                countdown.countdownReset = saved.countdownReset
-                countdown.damage         = saved.damage
-                countdown.killerName     = saved.killerName
-                countdown.type           = saved.type
+                if countdown then
+                    for _, field in ipairs(FIELDS) do countdown[field] = saved[field] end
+                    countdown.active = true
+                end
             end
 
             carried[ev.playerID] = nil
@@ -135,18 +173,20 @@ event.objectControllerChanged.add("apCarryDamageCountdown", { order = "player", 
         end
 
         local playerID = ev.entity.controllable and ev.entity.controllable.playerID
+        if not (playerID and playerID ~= 0) then return end
 
-        if not (playerID and playerID ~= 0 and countdown and countdown.active) then return end
+        for _, component in ipairs(COUNTDOWNS) do
+            local countdown = ev.entity[component]
 
-        carried[playerID] = {
-            countdown      = countdown.countdown,
-            countdownReset = countdown.countdownReset,
-            damage         = countdown.damage,
-            killerName     = countdown.killerName,
-            type           = countdown.type,
-        }
+            if countdown and countdown.active then
+                local saved = {}
+                for _, field in ipairs(FIELDS) do saved[field] = countdown[field] end
 
-        countdown.active = false
+                carried[playerID] = carried[playerID] or {}
+                carried[playerID][component] = saved
+                countdown.active = false
+            end
+        end
     end)
 
 -- Dropped with the countdowns themselves, at the end of the floor they were owed on.

@@ -120,7 +120,7 @@ event.objectInteract.add("toggleDeathlinkShrine", {
 }, function(ev)
     if not apClient.isSessionConnected() then
         sound.playFromEntity("error", ev.entity, { deduplicationID = ev.interactor and ev.interactor.id })
-        flyaway.create({ entity = ev.entity, text = "Not Connected!" })
+        flyaway.create({ entity = ev.entity, text = "AP Disconnected!" })
         ev.result = action.Result.FAILURE
         ev.suppressed = true
         return
@@ -147,7 +147,7 @@ event.objectInteract.add("toggleTraplinkShrine", {
 }, function(ev)
     if not apClient.isSessionConnected() then
         sound.playFromEntity("error", ev.entity, { deduplicationID = ev.interactor and ev.interactor.id })
-        flyaway.create({ entity = ev.entity, text = "Not Connected!" })
+        flyaway.create({ entity = ev.entity, text = "AP Disconnected!" })
         ev.result = action.Result.FAILURE
         ev.suppressed = true
         return
@@ -176,7 +176,7 @@ event.apConnect.add("syncSettingsShrines", { order = "connected", sequence = 2 }
         entity.spriteSheet.frameX = deathlink and 2 or 1
         lightSource.update(entity)
         if deathlink then
-            spawnOrbitParticles(entity, color.rgb(220, 50, 50))
+            spawnOrbitParticles(entity, color.rgb(198, 25, 164))
         end
     end
 
@@ -186,7 +186,7 @@ event.apConnect.add("syncSettingsShrines", { order = "connected", sequence = 2 }
         entity.spriteSheet.frameX = traplink and 2 or 1
         lightSource.update(entity)
         if traplink then
-            spawnOrbitParticles(entity, color.rgb(255, 165, 0))
+            spawnOrbitParticles(entity, color.rgb(204, 144, 40))
         end
     end
 end)

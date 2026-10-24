@@ -1,6 +1,7 @@
 local hasStorage, _ = pcall(require, "system.file.Storage")
 local hasClient, _ = pcall(require, "system.network.Client")
 local currentLevel = require "necro.game.level.CurrentLevel"
+local ecs = require "system.game.Entities"
 local lobbyGeneration = require "necro.game.data.level.LobbyGeneration"
 local marker = require "necro.game.tile.Marker"
 local object = require("necro.game.object.Object")
@@ -14,18 +15,18 @@ local apStorage = require("AP.scripts.client.storage")
 local progression = require("AP.scripts.client.progression")
 local apBuffRoom = require("AP.scripts.level.lobby.apBuffRoom")
 local apCharacterSelect = require("AP.scripts.level.lobby.apCharacterSelect")
+local apEnemyRoom = require("AP.scripts.level.lobby.apEnemyRoom")
 local apGameModeSelect = require("AP.scripts.level.lobby.apGameModeSelect")
-local apLobby = require("AP.scripts.level.apLobby")
 local apItemRoom = require("AP.scripts.level.lobby.apItemRoom")
 local lobbyUtils = require("AP.scripts.utils.lobbyUtils")
 local modConflict = require("AP.scripts.utils.modConflict")
 
 marker.Type.extend("AP_SPAWN")
+marker.Type.extend("AP_TRACKER")
 
 local apLobbyGenerateSelector = orderedSelector.new(event.apLobbyGenerate, {
     "lobby",
     "traps",
-    "collection",
     "characters",
     "modes",
     "hephaestus",
@@ -34,9 +35,9 @@ local apLobbyGenerateSelector = orderedSelector.new(event.apLobbyGenerate, {
     "janitor",
     "diamondDealer",
     "settingsmaster",
+    "trackermaster",
     "hintmaster",
     "codex",
-    "buffmaster",
     "miscNpcs"
 })
 
@@ -57,11 +58,21 @@ local function itemRoomFingerprint()
         parts[#parts + 1] = entry.id .. ":" .. tostring(entry.category)
     end
 
+    local enemies = 0
+    for _ in pairs(progression.getEnemyZones()) do enemies = enemies + 1 end
+    parts[#parts + 1] = "enemies:" .. tostring(progression.getEnemyChecks() and enemies or 0)
+
     return table.concat(parts, ",")
 end
 
-local function buildItemRoom(x, y)
-    itemRoomGenerated = apItemRoom.generateItemRoom(x, y)
+-- The Item Room stair sits left of the Trackermaster at (x, y), the Enemy Room stair right of it.
+local function buildTrackerRooms(x, y)
+    itemRoomGenerated = apItemRoom.generateItemRoom(x - 1, y + 2)
+
+    if itemRoomGenerated then
+        apEnemyRoom.generateEnemyRoom(x + 1, y + 2)
+    end
+
     itemRoomSignature = itemRoomGenerated and itemRoomFingerprint() or ""
 end
 
@@ -94,6 +105,8 @@ local function createMainAPTrapdoor(originX, originY)
 end
 
 event.lobbyGenerate.add("generateAPLobbyLevel", { order = "modes", sequence = 1 }, function(_)
+    lobbyUtils.forgetSegments()
+
     if modConflict.hasLegacyArchipelago() then
         createMainAPTrapdoor(0, 0)
     elseif hasStorage and hasClient then
@@ -119,7 +132,6 @@ event.apLobbyGenerate.add("generateLobby", "lobby", function(ev)
 
     ev.rect = { minX = minX, maxX = maxX, minY = minY, maxY = maxY }
     ev.segmentID = segmentID
-    apLobby.setSegment(ev.segmentID)
 
     local centerX = math.floor((minX + maxX) / 2)
     ev.origin = { x = centerX, y = 0 }
@@ -201,16 +213,12 @@ event.apLobbyGenerate.add("generateTraps", "traps", function(ev)
     end
 end)
 
-event.apLobbyGenerate.add("generateItemCollection", "collection", function(ev)
-    buildItemRoom(ev.origin.x - 3, ev.origin.y + 2)
-end)
-
 event.apConnect.add("delayedGenerateItemCollection", { order = "connected", sequence = 1 }, function(ev)
     if ev.status ~= "Connected" then return end
 
     if not itemRoomGenerated then
-        local x, y = marker.lookUpFirst(marker.Type.AP_SPAWN)
-        buildItemRoom(x - 3, y + 2)
+        local x, y = marker.lookUpFirst(marker.Type.AP_TRACKER)
+        if x then buildTrackerRooms(x, y) end
     elseif itemRoomSignature ~= itemRoomFingerprint() and currentLevel.isLobby() then
         lobbyGeneration.generate()
     end
@@ -346,23 +354,38 @@ end)
 
 event.apLobbyGenerate.add("generateSettingsMasterRoom", "settingsmaster", function(ev)
     local roomWidth = 11
-    local roomHeight = 7
+    local roomHeight = 9
 
     local minX = ev.rect.minX - (roomWidth - 1)
-    local minY = ev.rect.minY
+    local minY = ev.rect.minY + 6
 
     lobbyUtils.addRect(minX, minY, roomWidth, roomHeight, ev.wall, ev.floor, true)
 
     local centerX = minX + math.floor(roomWidth / 2)
 
-    object.spawn("Weaponmaster", centerX, minY + 2)
+    object.spawn("Weaponmaster", centerX - 1, minY + 2)
+    object.spawn("AP_Buffmaster", centerX + 1, minY + 2)
     lobbyUtils.addLabel(centerX, minY + 2, "mod.AP.lobby.settingsmasterHint", -26)
+    local shrineOffset = 0
+
+    if not ecs.isValidEntityType("CustomArtists_SongRandomizerShrine") then
+        shrineOffset = 1
+    end
 
     local deathlinkActive = apStorage.saveData and apStorage.saveData.deathlink == true
-    object.spawn("AP_ShrineDeathLink", centerX - 2, minY + 4, { shrine = { active = deathlinkActive } })
+    object.spawn("AP_ShrineDeathLink", centerX - 3 + shrineOffset, minY + 4, { shrine = { active = deathlinkActive } })
 
     local traplinkActive = apStorage.saveData and apStorage.saveData.traplink == true
-    object.spawn("AP_ShrineTrapLink", centerX + 2, minY + 4, { shrine = { active = traplinkActive } })
+    object.spawn("AP_ShrineTrapLink", centerX + (shrineOffset * 2), minY + 4, { shrine = { active = traplinkActive } })
+
+    if ecs.isValidEntityType("CustomArtists_SongRandomizerShrine") then
+        object.spawn("CustomArtists_SongRandomizerShrine", centerX + 3, minY + 4, {
+            worldLabel = { text = "" },
+            shrineHintLabel = { visible = true },
+        })
+    end
+
+    apBuffRoom.generateBuffRoom(centerX, minY + 6)
 
     local entranceX = ev.rect.minX
     local entranceY = minY + 3
@@ -373,6 +396,33 @@ event.apLobbyGenerate.add("generateSettingsMasterRoom", "settingsmaster", functi
             npc = {},
             orientation = "vertical",
             label = "mod.AP.lobby.npc.settingsmaster",
+        }
+    })
+end)
+
+-- Where the Settingsmaster's room was, mirroring the Hintmaster's on the other side.
+event.apLobbyGenerate.add("generateTrackermasterRoom", "trackermaster", function(ev)
+    local minX = ev.rect.minX - 6
+    local minY = ev.rect.minY
+
+    lobbyUtils.addRect(minX, minY, 7, 7, ev.wall, ev.floor, true)
+    local centerX = minX + 3
+
+    object.spawn("Beastmaster", centerX, minY + 2, { greetable = { greeted = true } })
+    lobbyUtils.addLabel(centerX, minY + 2, "mod.AP.lobby.trackermasterHint", -26)
+
+    marker.setFirst(marker.Type.AP_TRACKER, centerX, minY + 2)
+    buildTrackerRooms(centerX, minY + 2)
+
+    local entranceX = ev.rect.minX
+    local entranceY = minY + 3
+
+    lobbyUtils.clearTile(entranceX, entranceY, "Zone2")
+    object.spawn("AP_LobbyDoor", entranceX, entranceY, {
+        AP_progressionDoor = {
+            npc = {},
+            orientation = "vertical",
+            label = "mod.AP.lobby.npc.trackermaster",
         }
     })
 end)
@@ -443,26 +493,4 @@ event.apLobbyGenerate.add("generateCodexRoom", "codex", function(ev)
     lobbyUtils.clearTile(entranceX, entranceY, "Zone2")
     object.spawn("AP_LobbyDoor", entranceX, entranceY,
         { AP_progressionDoor = { npc = { "Trainer" }, orientation = "vertical" } })
-end)
-
-event.apLobbyGenerate.add("generateBuffmasterRoom", "buffmaster", function(ev)
-    local minX = ev.rect.minX - 6
-    local minY = ev.rect.minY + 6
-
-    lobbyUtils.addRect(minX, minY, 7, 7, ev.wall, ev.floor, true)
-    local centerX = minX + 3  -- = ev.rect.maxX + 10
-
-    -- Buffmaster NPC with hint label above.
-    object.spawn("AP_Buffmaster", centerX, minY + 2)
-    lobbyUtils.addLabel(centerX, minY + 2, "mod.AP.lobby.buffmasterHint", -26)
-
-    -- Staircase to the dedicated Buff Room (addDestination sets tile + label).
-    apBuffRoom.generateBuffRoom(centerX, minY + 4)
-
-    local entranceX = ev.rect.minX
-    local entranceY = minY + 3
-
-    lobbyUtils.clearTile(entranceX, entranceY, "Zone2")  -- buffmaster left wall
-    object.spawn("AP_LobbyDoor", entranceX, entranceY,
-        { AP_progressionDoor = { npc = { "Buffmaster" }, orientation = "vertical" } })
 end)

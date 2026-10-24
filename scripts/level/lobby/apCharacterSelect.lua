@@ -60,7 +60,7 @@ function apCharacterSelect.createCharacterSelectionRoom(x, y)
         "TriggerTravelPrimaryOnly", {
             AP_trapUnlock = {
                 lockType = "characterRoomKey",
-                lockedText = "Find the key to unlock!",
+                lockedText = "Receive the key to unlock!",
             }
         })
 

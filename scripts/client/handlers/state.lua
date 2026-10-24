@@ -11,12 +11,12 @@ local saveUpdateHandler = require("AP.scripts.client.handlers.saveUpdate")
 local apUtils = require("AP.scripts.utils.apUtils")
 local progression = require("AP.scripts.client.progression")
 
-local function buildNpcTable(npc_dict)
+local function buildCagedNpcTable(npc_dict)
     local result = {}
     if npc_dict ~= nil and next(npc_dict) ~= nil then
         for npc, info in pairs(npc_dict) do
             result[npc] = {
-                unlocked = false,
+                freed = false,
                 zone = info.zone,
                 level = info.level,
                 unlockType = info.unlockType,
@@ -25,7 +25,7 @@ local function buildNpcTable(npc_dict)
     else
         local LOBBY_NPCS = { "Codex", "Merlin", "Hintmaster", "Janitor", "Diamond Dealer" }
         for _, npc in ipairs(LOBBY_NPCS) do
-            result[npc] = { unlocked = true }
+            result[npc] = { freed = true }
         end
     end
     return result
@@ -81,9 +81,10 @@ local function applyState(data)
     local saveData = apStorage.saveData
 
     -- Fields present on every State packet (init and reconnect)
-    saveData.deathlink    = data.deathlink or false
-    saveData.traplink     = data.traplink or false
-    saveData.hintBaseCost = data.hint_cost or 10
+    saveData.deathlink        = data.deathlink or false
+    saveData.traplink         = data.traplink or false
+    saveData.songRandomizer   = data.song_randomizer
+    saveData.hintBaseCost     = data.hint_cost or 10
 
     -- Computed + non-derivable fields from Python's save state
     for snakeKey, camelKey in pairs(saveUpdateHandler.FIELD_MAP) do
@@ -115,6 +116,10 @@ local function applyState(data)
         saveData.characterRequirements = data.character_requirements or {}
         saveData.includeUniqueItems = isEnabled(data.include_unique_items)
         saveData.shrineChecks       = isEnabled(data.include_shrine_checks)
+        saveData.enemyChecks        = isEnabled(data.include_enemy_checks)
+        -- Resolved by the apworld, which knows which enemies this slot's DLC put in the pool.
+        saveData.enemyLocations     = data.enemy_locations or {}
+        saveData.enemyZones         = data.enemy_zones or {}
         saveData.itemChecks         = (data.items_per_zone or 0) > 0
         saveData.flawlessChestChecks = isEnabled(data.include_flawless_chest_checks)
         saveData.itemChance         = data.item_generation_chance or 50
@@ -130,7 +135,7 @@ local function applyState(data)
         saveData.expensivePurchasePrice = data.expensive_purchase_price or 150
         saveData.goldToDiamondRate      = data.diamond_exchange_rate or 100
         saveData.itemRoom           = data.item_room or {}
-        saveData.unlockedNPCs       = buildNpcTable(data.caged_npc_locations)
+        saveData.cagedNPCs          = buildCagedNpcTable(data.caged_npc_locations)
         saveData.npcHintLocations   = data.npc_hint_locations or {}
         saveData.pricing            = buildPricing(data.price_randomization, data.price_ranges)
     end

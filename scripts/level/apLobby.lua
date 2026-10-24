@@ -20,6 +20,7 @@ local apCharacters = require("AP.scripts.utils.apCharacters")
 local apClient = require("AP.scripts.client.client")
 local apFlags = require("AP.scripts.utils.flags")
 local apInventory = require("AP.scripts.utils.apInventory")
+local lobbyUtils = require("AP.scripts.utils.lobbyUtils")
 local localCoop = require "necro.client.LocalCoop"
 local player = require "necro.game.character.Player"
 local progression = require("AP.scripts.client.progression")
@@ -28,7 +29,6 @@ local AP_LOBBY_ACTION = action.System.extend("AP_LOBBY")
 
 local APLobby = {
     spawn = { x = nil, y = nil },
-    segmentID = -1
 }
 
 function APLobby.getAPLobbySpawn()
@@ -107,15 +107,8 @@ event.turn.add("apTeleportToAPLobby", "customActions", function(ev)
     end
 end)
 
-function APLobby.setSegment(segmentID)
-    APLobby.segmentID = segmentID
-end
-
 function APLobby.isInLobby(entity)
-    if APLobby.segmentID == -1 then return false end
-    -- return segment.contains(APLobby.segmentID, entity.position.x, entity.position.y)
-    local playerSegment = segment.getSegmentIDAt(entity.position.x, entity.position.y)
-    return playerSegment >= APLobby.segmentID
+    return lobbyUtils.isAPSegment(segment.getSegmentIDAt(entity.position.x, entity.position.y))
 end
 
 event.gameStateLevel.add("teleportAPPlayer", { order = "splitScreen" }, function(ev)

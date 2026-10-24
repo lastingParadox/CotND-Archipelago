@@ -22,6 +22,7 @@ local PATTERNS = {
     ALL_ZONES  = "^(.-) %- (All Zones)$",
     MODE       = "^(.-) %- (.+ Mode)$",
     NPC        = "^Caged (.+)$",
+    ENEMY      = "^Defeat .+$",
 }
 
 
@@ -62,6 +63,13 @@ local function parseLocation(location, saveData)
     if SHRINE_LOCATION_NAMES[location] then
         return {
             type = "shrine",
+            location = location,
+        }
+    end
+
+    if match(location, PATTERNS.ENEMY) then
+        return {
+            type = "enemy",
             location = location,
         }
     end
@@ -113,6 +121,15 @@ local function parseMissingLocations(saveData, missing_locations)
             goto continue
         end
 
+        if parsed.type == "enemy" then
+            local enemies = saveData.characterLocations["Enemies"] or {}
+            if enemies[parsed.location] == nil then
+                enemies[parsed.location] = false
+            end
+            saveData.characterLocations["Enemies"] = enemies
+            goto continue
+        end
+
         if parsed.type == "character" then
             local zone = parsed.zone
             -- Floor checks carry no zone key, so there is nothing to seed for them.
@@ -148,10 +165,17 @@ local function updateLocations(saveData, checked_locations)
             goto continue
         end
 
+        if parsed.type == "enemy" then
+            local enemies = character_locations["Enemies"] or {}
+            enemies[parsed.location] = true
+            character_locations["Enemies"] = enemies
+            goto continue
+        end
+
         if parsed.type == "npc" then
-            local npc = saveData.unlockedNPCs[parsed.npc]
-            if npc and npc.unlocked == false then
-                npc.unlocked = true
+            local npc = saveData.cagedNPCs[parsed.npc]
+            if npc then
+                npc.freed = true
             end
             goto continue
         end

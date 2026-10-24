@@ -1,3 +1,4 @@
+local beatmap = require("necro.audio.Beatmap")
 local collision = require("necro.game.tile.Collision")
 local customEntities = require("necro.game.data.CustomEntities")
 local ecs = require("system.game.Entities")
@@ -270,6 +271,9 @@ local unlockedByCategory = {
     upgrade = function(item)
         return progression.getReceivedCount(item) > 0
     end,
+    enemy = function(item)
+        return not progression.getEnemyLocation(item) or progression.isEnemyDefeated(item)
+    end,
 }
 
 local function isItemLocked(item, data)
@@ -293,6 +297,53 @@ local function countText(item, data)
     return count > 0 and ("x" .. count) or nil
 end
 
+local MOLE_BURROW = { texture = "ext/entities/mole_dirt.png", x = 0, y = 10, width = 24, height = 24, z = 1 }
+
+-- Per-enemy corrections to how its bare prototype previews; offsetY is in pixels, negative is up.
+local ENEMY_DISPLAY = {
+    Trapchest     = { offsetY = -5 },
+    Trapchest2    = { offsetY = -5 },
+    Trapchest3    = { offsetY = -5 },
+    Trapchest4    = { offsetY = -5 },
+    Trapchest6    = { offsetY = -5 },
+    Fakewall      = { offsetY = -12, scale = 0.75 },
+    Fakewall2     = { offsetY = -12, scale = 0.75 },
+    Tarmonster    = { preview = "TarmonsterExtracted" },
+    Mole          = { offsetY = -7, overlay = MOLE_BURROW },
+    Sarcophagus   = { offsetY = -2 },
+    Sarcophagus2  = { offsetY = -2 },
+    Sarcophagus3  = { offsetY = -2 },
+    Lich          = { offsetY = -2 },
+    Lich2         = { offsetY = -2 },
+    Lich3         = { offsetY = -2 },
+    Warlock       = { offsetY = -2 },
+    Warlock2      = { offsetY = -2 },
+    Orc           = { frames = { 9, 10, 11, 12 } },
+    Orc2          = { frames = { 9, 10, 11, 12 } },
+    Orc3          = { frames = { 9, 10, 11, 12 } },
+    Yeti          = { frames = { 3, 4 } },
+}
+
+local function enemyData(item)
+    local display = ENEMY_DISPLAY[item] or {}
+
+    return {
+        category = "enemy",
+        preview = display.preview or item,
+        offsetY = 5 + (display.offsetY or 0),
+        scale = display.scale,
+        overlay = display.overlay,
+        frames = display.frames,
+    }
+end
+
+-- Steps through `frames` once per beat.
+local function beatFrame(frames)
+    local fraction = beatmap.get().getMusicBeatFraction()
+
+    return frames[math.floor(fraction * #frames) % #frames + 1]
+end
+
 event.objectTryCollectItem.add("apPickupShowcaseFail", { order = "checkItem" }, function(ev)
     if (ev.item.AP_itemShowcase and ev.item.AP_itemShowcase.active == true) then
         ev.result = itemPickup.Result.FAILURE
@@ -304,7 +355,9 @@ event.render.add("apItemShowCasePreview", { order = "characterPreview", sequence
     for entity in ecs.entitiesWithComponents({ "AP_itemShowcase" }) do
         if entity.visibility and entity.visibility.visible and entity.AP_itemShowcase.active then
             local item = entity.AP_itemShowcase.item
-            local data = apItemShowcase.getShowcaseData(item) or {}
+            local category = entity.AP_itemShowcase.category
+            local data = category == "enemy" and enemyData(item)
+                or apItemShowcase.getShowcaseData(item) or {}
             local preview = ecs.getEntityPrototype(data.preview or item)
 
             if preview then
@@ -318,6 +371,9 @@ event.render.add("apItemShowCasePreview", { order = "characterPreview", sequence
                     -- Per-sprite nudge off the label, for the taller entries in a category.
                     offsetY = data.offsetY or (descriptor and descriptor.offsetY) or 5,
                     countText = not locked and countText(item, data) or nil,
+                    scale = data.scale,
+                    overlay = data.overlay,
+                    frameX = data.frames and beatFrame(data.frames) or nil,
                 })
             end
         end

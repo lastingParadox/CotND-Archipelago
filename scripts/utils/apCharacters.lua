@@ -110,12 +110,11 @@ function apCharacters.getMissingRequiredItems(name)
     return #missing > 0 and missing or nil
 end
 
--- Excluded by the slot rather than simply not found yet.
+-- Kept out of the slot by its DLC rather than simply not found yet.
 function apCharacters.isCharacterDisabled(name)
     local character = apCharacters.cotNDCharToAPLocation(name)
     local requirement = apCharacters.characterRequirements[character]
 
-    if progression.getCharacterBlacklist(character) then return true end
     if requirement and requirement ~= "None" and not progression.isDLCEnabled(requirement) then return true end
 
     return false

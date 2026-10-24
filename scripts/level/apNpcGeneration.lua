@@ -30,8 +30,8 @@ end)
 local function keysForFloor(zone, floor)
     local owed = {}
 
-    for npcName, npcData in pairs(progression.getUnlockedNPCs() or {}) do
-        if not npcData.unlocked and npcData.zone == zone then
+    for npcName, npcData in pairs(progression.getCagedNPCs() or {}) do
+        if not npcData.freed and npcData.zone == zone then
             if npcData.unlockType == "Dig" and npcData.level == floor then
                 owed[#owed + 1] = { npc = npcName, keyType = "MiscGoldenKey" }
             elseif npcData.unlockType == "Glass" and npcData.level == floor + 1 then
@@ -71,8 +71,8 @@ local function queueKey(keyType, channel)
 end
 
 event.levelLoad.add("apGenerateLobbyNpcs", "progression", function(ev)
-    local unlockedNPCs = progression.getUnlockedNPCs()
-    if not unlockedNPCs or not apUtils.isAPContext() then return end
+    local cagedNPCs = progression.getCagedNPCs()
+    if not cagedNPCs or not apUtils.isAPContext() then return end
 
     local curZone  = currentLevel.getZone()
     local curFloor = currentLevel.getFloor()
@@ -93,12 +93,12 @@ event.levelLoad.add("apGenerateLobbyNpcs", "progression", function(ev)
         end
     end
 
-    for npc_name, npc_data in pairs(unlockedNPCs) do
+    for npc_name, npc_data in pairs(cagedNPCs) do
         local correctZone = npc_data.zone == curZone
         local correctFloor = npc_data.level == curFloor
 
         -- Place NPC + cage
-        if not npc_data.unlocked and correctZone and correctFloor then
+        if not npc_data.freed and correctZone and correctFloor then
             local name = apCharacters.apLocationToCotNDNPC(npc_name)
             local localKey, flyaway2 = getUnlockData(npc_data.unlockType)
 
@@ -132,14 +132,14 @@ end)
 -- NPC Shop key generation
 event.generateShopItems.add("generateAPShop", { filter = "generateShopNormal", order = "all", sequence = 1 },
     function(ev)
-        local unlockedNPCs = progression.getUnlockedNPCs()
-        if not unlockedNPCs or not apUtils.isAPContext() then return end
+        local cagedNPCs = progression.getCagedNPCs()
+        if not cagedNPCs or not apUtils.isAPContext() then return end
 
         local curZone  = currentLevel.getZone()
         local curFloor = currentLevel.getFloor()
 
-        for _, npc_data in pairs(unlockedNPCs) do
-            if (npc_data.unlocked == true) then goto continue end
+        for _, npc_data in pairs(cagedNPCs) do
+            if npc_data.freed then goto continue end
             local correctZone = npc_data.zone == curZone
             local correctFloor = npc_data.level == curFloor
 

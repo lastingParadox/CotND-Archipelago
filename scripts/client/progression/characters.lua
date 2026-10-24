@@ -116,8 +116,8 @@ local function attach(progression)
         return locations
     end
 
-    function progression.getUnlockedNPCs(npc)
-        local npcs = apStorage.saveData.unlockedNPCs or {}
+    function progression.getCagedNPCs(npc)
+        local npcs = apStorage.saveData.cagedNPCs or {}
         if npc then
             return npcs[npc]
         end
@@ -128,8 +128,8 @@ local function attach(progression)
         if not npc or npc == "" then return end
 
         apLog("NPC freed: " .. npc)
-        apStorage.saveData.unlockedNPCs[npc] = apStorage.saveData.unlockedNPCs[npc] or {}
-        apStorage.saveData.unlockedNPCs[npc].unlocked = true
+        apStorage.saveData.cagedNPCs[npc] = apStorage.saveData.cagedNPCs[npc] or {}
+        apStorage.saveData.cagedNPCs[npc].freed = true
 
         progression.sendLocationChecks("Caged " .. npc)
     end

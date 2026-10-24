@@ -44,7 +44,9 @@ local function centeredColumns(count)
     return columns
 end
 
-local function chamberLayout(count)
+function apItemRoom.chamberLayout(count, pitch)
+    pitch = pitch or PITCH
+
     -- Squarest grid that holds them, so a category does not stretch into one long row.
     local cols = math.min(CHAMBER_COLUMNS, math.ceil(math.sqrt(count)))
     local rows = math.ceil(count / cols)
@@ -52,19 +54,20 @@ local function chamberLayout(count)
     return {
         cols = cols,
         rows = rows,
-        width = math.max(CHAMBER_MIN_WIDTH, STAIR_DX + (cols - 1) * PITCH + 3),
-        height = math.max(CHAMBER_MIN_HEIGHT, rows * PITCH + 6),
+        pitch = pitch,
+        width = math.max(CHAMBER_MIN_WIDTH, STAIR_DX + (cols - 1) * pitch + 3),
+        height = math.max(CHAMBER_MIN_HEIGHT, rows * pitch + 6),
     }
 end
 
 -- Claims the whole footprint up front, collapsing one map resize per room into a single one.
-local function reserveLevelSpace(chamberLayouts)
+function apItemRoom.reserveLevelSpace(hubWidth, hubHeight, chamberLayouts)
     local lastX, _, lastWidth = segment.getBounds(segment.getCount())
 
     -- Mirrors addRoom's placement: one tile past the previous segment, one row below its floor.
     local right = lastX + lastWidth
-    local bottom = HUB_MIN_Y + HUB_HEIGHT
-    right = right + 1 + HUB_WIDTH
+    local bottom = HUB_MIN_Y + hubHeight
+    right = right + 1 + hubWidth
 
     for _, layout in ipairs(chamberLayouts) do
         right = right + 1 + layout.width
@@ -78,33 +81,32 @@ local function reserveLevelSpace(chamberLayouts)
     tile.setLevelBounds(merged[1], merged[2], merged[3], merged[4])
 end
 
-local function generateChamber(group, layout, hubX, hubY)
-    local descriptor = group.descriptor
+---Builds a chamber of `entries` laid out by `layout`, calling `spawn(entry, x, y)` for each.
+---@return number arrivalX, number arrivalY
+function apItemRoom.buildChamber(titleKey, backKey, layout, hubX, hubY, entries, spawn)
     local minX, _, minY = lobbyUtils.addRoom(layout.width, layout.height, HUB_MIN_Y, "Zone2")
 
     local centerX = minX + math.floor(layout.width / 2)
 
-    lobbyUtils.addLabelForced(centerX, minY + 1, "mod.AP.lobby.itemCat." .. descriptor.id, 3,
-        layout.width - 2)
+    lobbyUtils.addLabelForced(centerX, minY + 1, titleKey, 3, layout.width - 2)
 
-    lobbyUtils.addDestination(minX + STAIR_DX, minY + 2, hubX, hubY, "mod.AP.lobby.stairBackHub",
-        "TriggerTravelPrimaryOnly")
+    lobbyUtils.addDestination(minX + STAIR_DX, minY + 2, hubX, hubY, backKey, "TriggerTravelPrimaryOnly")
 
-    for index, entry in ipairs(group.items) do
+    for index, entry in ipairs(entries) do
         local column = (index - 1) % layout.cols
         local row = math.floor((index - 1) / layout.cols)
-        local itemX = minX + STAIR_DX + column * PITCH
-        local itemY = minY + 4 + row * PITCH
 
-        object.spawn("AP_ItemShowcase", itemX, itemY,
-            { AP_itemShowcase = { active = true, item = entry.name } })
-
-        local proto = ecs.getEntityPrototype(entry.data.preview or entry.name)
-        lobbyUtils.addTextLabel(itemX, itemY,
-            apItemShowcase.getShowcaseLabel(entry.name, entry.data, proto), 10, PITCH)
+        spawn(entry, minX + STAIR_DX + column * layout.pitch, minY + 4 + row * layout.pitch)
     end
 
     return minX + STAIR_DX, minY + 3
+end
+
+local function spawnItemShowcase(entry, x, y)
+    object.spawn("AP_ItemShowcase", x, y, { AP_itemShowcase = { active = true, item = entry.name } })
+
+    local proto = ecs.getEntityPrototype(entry.data.preview or entry.name)
+    lobbyUtils.addTextLabel(x, y, apItemShowcase.getShowcaseLabel(entry.name, entry.data, proto), 10, PITCH)
 end
 
 function apItemRoom.generateItemRoom(x, y)
@@ -158,10 +160,10 @@ function apItemRoom.generateItemRoom(x, y)
 
     local layouts = {}
     for index, group in ipairs(chamberGroups) do
-        layouts[index] = chamberLayout(#group.items)
+        layouts[index] = apItemRoom.chamberLayout(#group.items)
     end
 
-    reserveLevelSpace(layouts)
+    apItemRoom.reserveLevelSpace(HUB_WIDTH, HUB_HEIGHT, layouts)
 
     local hubMinX, _, hubMinY = lobbyUtils.addRoom(HUB_WIDTH, HUB_HEIGHT, HUB_MIN_Y, "Zone2")
     local hubCenterX = hubMinX + math.floor(HUB_WIDTH / 2)
@@ -226,7 +228,9 @@ function apItemRoom.generateItemRoom(x, y)
 
     for index, stair in ipairs(stairs) do
         local layout = layouts[index]
-        local arrivalX, arrivalY = generateChamber(stair.group, layout, stair.x, stair.y)
+        local arrivalX, arrivalY = apItemRoom.buildChamber(
+            "mod.AP.lobby.itemCat." .. stair.group.descriptor.id, "mod.AP.lobby.stairBackHub",
+            layout, stair.x, stair.y, stair.group.items, spawnItemShowcase)
 
         lobbyUtils.addDestination(stair.x, stair.y, arrivalX, arrivalY, nil, "TriggerTravelPrimaryOnly")
         lobbyUtils.addLabelForced(stair.x, stair.y,

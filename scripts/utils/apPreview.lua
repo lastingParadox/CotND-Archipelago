@@ -69,6 +69,20 @@ function apPreview.checkOutline(item)
         color.forClassification(item.AP_locationItem.classification), OUTLINE_ALPHA)
 end
 
+-- Forces a sprite frame on the preview, for prototypes without a normalAnimation to pick one.
+event.objectPreview.add("apPreviewFrame", { filter = "sprite", order = "animation", sequence = 1 }, function(ev)
+    if ev.AP_frameX and ev.visual then
+        ev.visual.texRect[1] = (ev.AP_frameX - 1) * ev.entity.sprite.width
+    end
+end)
+
+local function scaleFromBottom(rect, scale)
+    rect[1] = rect[1] + rect[3] * (1 - scale) / 2
+    rect[2] = rect[2] + rect[4] * (1 - scale)
+    rect[3] = rect[3] * scale
+    rect[4] = rect[4] * scale
+end
+
 local function resolve(proto)
     return type(proto) == "string" and ecs.getEntityPrototype(proto) or proto
 end
@@ -102,6 +116,7 @@ function apPreview.draw(proto, opts)
             or nil,
         shadowCopyZ = component.shadowCopyZ,
         playerID = opts.playerID or playerList.getLocalPlayerID(),
+        AP_frameX = opts.frameX,
     }
 
     if opts.previewArgs then
@@ -124,11 +139,14 @@ function apPreview.draw(proto, opts)
         end
     end
 
-    if opts.grayscale then
+    if opts.grayscale or opts.scale then
         local buffer = render.getBuffer(render.Buffer.OBJECT)
         for _, visual in ipairs(objectPreview.getVisuals(proto, args)) do
-            if visual.texture then
+            if opts.grayscale and visual.texture then
                 visual.texture = grayscaleFilter.getPath(visual.texture)
+            end
+            if opts.scale then
+                scaleFromBottom(visual.rect, opts.scale)
             end
             buffer.draw(visual)
         end
@@ -146,7 +164,7 @@ function apPreview.draw(proto, opts)
             rect = { baseX + overlay.x, baseY + overlay.y + offsetY + hoverY,
                 overlay.width, overlay.height },
             texRect = { 0, 0, overlay.width, overlay.height },
-            z = baseY + offsetZ + hoverY,
+            z = baseY + offsetZ + hoverY + (overlay.z or 0),
             color = silhouette and color.BLACK or args.color,
         })
     end

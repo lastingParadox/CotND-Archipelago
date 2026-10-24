@@ -11,8 +11,17 @@ local tileTypes = require("necro.game.tile.TileTypes")
 
 local lobbyUtils = {}
 local lightSources = {}
+local apSegments = {}
 
 marker.Type.extend("AP_SPAWN")
+
+function lobbyUtils.forgetSegments()
+    apSegments = {}
+end
+
+function lobbyUtils.isAPSegment(segmentID)
+    return apSegments[segmentID] == true
+end
 
 function lobbyUtils.addTorch(x, y, radius)
     local entity = object.spawn("WallTorch", x, y, {
@@ -83,6 +92,8 @@ function lobbyUtils.addRoom(width, height, minY, zone, segmentRect)
     else
         segmentID = segment.add(minX, minY, width, height)
     end
+
+    apSegments[segmentID] = true
 
     local wall = tileTypes.lookUpTileID("UnbreakableWall", tileTypes.lookUpZoneID(zone or "Zone1"))
     local floor = tileTypes.lookUpTileID("Floor", tileTypes.lookUpZoneID(zone or "Zone1"))

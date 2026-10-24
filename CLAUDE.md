@@ -78,8 +78,21 @@ in chat, and the Archipelago trapdoor stays closed. That stub list is hand-maint
 sits behind an early `return`, so **any `apClient` member defined below it does not exist
 in degraded mode** — touching one at module scope crashes the whole mod at load rather
 than degrading. A field the literal sets to `nil` is absent for this purpose too.
-`necro.*` modules never need the guard. `system.mod.ModLoader` and `necro.mod.Mods` are **not reachable at all** — detect
-other mods via `resources.getData(netplay.Resource.MOD_LIST)`
+What a mod may require is set in the game's `config.json`, not by convention:
+
+```
+wos.game.mods.scriptWhitelist = necro.*, system.game.{Audio,Bitmap,Entities,FileIO,Graphics,Input},
+                                system.network.IPC, system.events.*, system.gfx.*, system.i18n.*, system.utils.*
+wos.game.mods.scriptBlacklist = necro.mod.*
+```
+
+So `necro.*` needs no guard **except `necro.mod.*`, which is blacklisted outright** —
+`AssetMod`, `ModWizard`, `Mods` all raise *"Cannot require module … Permission denied"* at
+load. Anything they expose has to be reproduced (a local playlist's folder is its
+`res_`-stripped name under `ext/mods`). Another mod's scripts are exempt from the list once
+that mod is loaded (`ModScriptProvider.lua:85`), so `require "CustomArtists.scripts.…"`
+works. `system.mod.ModLoader` is likewise out of the whitelist —
+detect other mods via `resources.getData(netplay.Resource.MOD_LIST)`
 (see [modConflict.lua](scripts/utils/modConflict.lua) and
 [version.lua](scripts/utils/version.lua)).
 
@@ -88,7 +101,12 @@ other mods via `resources.getData(netplay.Resource.MOD_LIST)`
 `ScriptLoader` puts a `__newindex` on every module table. `someModule.fn = ...` throws
 *"Attempt to modify module member"* immediately. **Monkey-patching is impossible**, even
 temporarily for instrumentation. `event.<name>.override(handlerName, fn)` is the only
-supported seam; when there is no seam, reproduce the logic.
+supported seam; when there is no seam, reproduce the logic. Reading a member that does not
+exist raises *"Attempt to access non-existent member"* rather than returning `nil`, so test
+for absence with `pcall`. The protection is on what `require` hands out: a module's own
+functions still reassign its members (`apStorage.initSession` replaces `saveData`), but another
+module may only change what is *inside* one — which is why tests go through
+`apTest.withSaveData`, which swaps `saveData`'s contents in place.
 
 A module that ends without `return` becomes an error table that raises on any access
 (`necro.render.hud.TimerHUD` is one). Read user settings through
@@ -181,11 +199,19 @@ end)
 event.entitySchemaLoadNamedEntity.add("apMarv", { order = "overrides", sequence = 1, key = "Marv" }, ...)
 ```
 
+`customEntities.register` runs its definition through `entityPostProcessor.apply`, so
+`entitySchemaLoadNamedEntity` fires for **another mod's** custom entities too, keyed on the
+prefixed name (`CustomArtists_SongRandomizerShrine`). That is the seam for amending one. A
+component added there is type-wide, and the other mod's own copies get it as well — so give
+it a default that changes nothing (`visible = false`) and switch it on per instance through
+`object.spawn`'s attributes, which only `components.field.*` accept.
+
 New entities come from `necro.game.data.CustomEntities` — wrapped here by
 [apItemFactory.lua](scripts/items/apItemFactory.lua) (`define` for carriers,
 `defineDisplay` for cosmetic props, `disguise` to wear another item's sprite).
-Registration order fixes entity type IDs, and every client must agree on them — so
-ordered lists like `PLACEHOLDERS` in [apItem.lua](scripts/items/apItem.lua) stay ordered.
+Custom entities register as `entitySchemaCustomEntities` handlers named after the entity, and
+`OrderedSelector` sorts handlers sharing an order and sequence **by name** — so registration
+order is alphabetical, not declaration order, and identical on every client by construction.
 
 ### Events
 
@@ -194,10 +220,17 @@ event.turn.add("apDeliverItemActions", { order = "customActions", sequence = 0 }
 event.objectSpawn.add("apGrantInitialItems", { filter = "initialInventoryUnlockReceiver", order = "itemsUnlockable", sequence = 1 }, ...)
 ```
 
-- Handler names are auto-prefixed with the mod namespace (`AP_apGrantInitialItems`) and
-  must be unique per event. **The name must be alphanumeric only** — an underscore is
-  rejected by `Events.lua` (`slotHandlerName` in trapSystem.lua spells out signs and
-  digits because of this).
+- Handler names may contain **only letters and digits** — `event.<name>.add` raises
+  *"Invalid event handler name"* on anything matching `%W`, underscores included, then
+  prefixes the mod namespace itself (`necro/event/Event.lua:67-74`). Never build a name by
+  concatenating a key that can hold `_` (a menu name like `CustomArtists_grid`). Keep names
+  unique and descriptive. `scriptMetaInfo.validateAndPrefix` is the separate rule for
+  **components, custom entities, custom weapons, enum extensions, HUD elements, and `Delay`
+  names**: it adds `AP_` and rejects any underscore outside that prefix.
+- The second argument to `add` is the filter key, kept separate from the name, so a
+  mod-registered key matches the engine's dispatch exactly as a vanilla one does.
+- Handlers may only be registered at **load time**; `add` inside a handler raises
+  *"Attempt to register handler … at run time."*
 - Vanilla handlers all sit at `sequence = 0`. Negative sequences run before vanilla,
   positive after.
 - Prefer `filter = "componentName"` over an `if` inside the body; the engine caches the
@@ -246,10 +279,14 @@ scripts/
   level/                     lobby + run generation, item generation, extras rooms, modes
   modes/                     APAllZones, APSingleZone, APEnsemble, APBossRush game modes
   buffs/                     per-character permanent run buffs
-  audio/                     apSongRandomizer.lua (song + artist shuffle over musicTrack)
+  audio/                     apSongRandomizer.lua (supplies AP's settings + seed to CustomArtists)
+  menu/                      connection menus + AP's own song randomizer menu
+  test/                      in-game test harness
+    apTest.lua               define/run/watch + the `aptest` console commands
+    cases/*.lua              one file per area, self-registering
   ui/                        flyaway queue, chat badge, HUDs, trap status, outlines
   utils/                     characters, items, inventory, level gen, colors, log, version
-  weapons/ tile/ menu/       supporting content
+  weapons/ tile/             supporting content
 ```
 
 Synchrony auto-loads every `.lua` under the mod (`mod.json`'s `api.scriptPath` is `""`),
@@ -355,6 +392,14 @@ game mode select). [lobbyUtils.lua](scripts/utils/lobbyUtils.lua) and
 [levelGen.lua](scripts/utils/levelGen.lua) are the helpers — use `lobbyUtils.addRoom`,
 `addLabel`, `addDestination`, `levelGen.placeObject` rather than touching tiles directly.
 
+Standing "in the AP lobby" means standing in a segment `lobbyUtils.addRoom` created, so every AP
+room must come from it. Segment ids are not a range: vanilla's `trainingRooms` pass runs after the
+AP lobby, so the Beastmaster and Bossmaster rooms sit at higher ids than the AP hub, and rooms built
+on connect land after them. The Trackermaster room holds the Item Room and Enemy Room stairs;
+the Enemy Room groups checks by the slot's `enemy_zones` (the engine's `enemyPoolZoneN` pools when
+there are none), with `enemyPoolMiniboss` prototypes split out, and draws each one as an
+`AP_ItemShowcase` whose `category` is `"enemy"`; an enemy with no check is never silhouetted.
+
 `apExtrasRoom.demand(name, estimate)` is how a feature asks a floor for extra rooms; the
 estimator runs at `levelSequenceUpdate` so all demands collapse into one map resize.
 
@@ -365,6 +410,39 @@ not overlap — except beat-synced text, which must call `flyaway.create` direct
 Chat notices go through [apChatBadge.addMessage](scripts/ui/apChatBadge.lua). Trap
 indicators register a poll-based provider with
 [apTrapStatus.register](scripts/ui/apTrapStatus.lua).
+
+### Tests — [scripts/test/apTest.lua](scripts/test/apTest.lua)
+
+`necro.debug.DebugCommands` is reachable from a mod (`necro.*` is whitelisted), and
+`debugCommands.register(name, fn)` is only `event.debugCommand.add(name, name, fn)`, so
+the harness registers real Lua-console commands with no patching. Enable the debug console
+in Options → Advanced, then **Shift+F4**. `aptest()` runs every test (`aptest("filter")` a
+subset) and reports a summary in chat and the log; `aptests()` only lists what is registered;
+`aptestwatch()` toggles level tests on each floor load. The engine's own suite is at
+`necro/test/Test.lua` and is worth reading before extending this one.
+
+```lua
+apTest.define({ name = "someInvariant", run = function(t) t.eq(a, b) end })
+```
+
+Three kinds, chosen by a flag on the spec:
+
+- **schema** (default) — no level, no player, no turn. Item bans resolve straight from type
+  names, since `itemBan.getBanFlags` puts both arguments through `ecs.getEntityTypeName`,
+  which returns a string unchanged. Most tests belong here.
+- **`world = true`** — a flat 19×19 floor uploaded as the `DUNGEON` resource with
+  `options.modeID`, which is what `gameSession.getCurrentModeID` reads, so the floor comes
+  up in an AP mode with a fixed `options.seed`. Runs only from the lobby in single player,
+  because it overwrites the dungeon resource. `t.act(...)` steps turns synchronously.
+- **`level = true`** — assertions against whatever floor is loaded. `aptestwatch()` runs
+  them on every `gameStateLevel` past `levelLoadingDone`, which is the seam where the floor
+  is built and `currentLevel` has stopped reading as loading.
+
+Assertions record and continue rather than throwing; an uncaught error fails the one test.
+The registry is unpersisted, so a reload re-runs every `define` cleanly.
+
+`luaparser` (Python) parses this codebase, so `ast.parse` over `scripts/**/*.lua` is an
+offline syntax gate that needs no game.
 
 ---
 
@@ -444,15 +522,18 @@ CotND (this mod) ──JSON/TCP──> CotNDServer ──> CotNDContext ──We
 | `Trap` | trap.lua | Incoming TrapLink: `trap_name` + `args` |
 | `Chat` | chat.lua | Server message into game chat |
 | `SetDeathLink` / `SetTrapLink` / `SetDiamonds` | respective files | Server-driven toggles |
-| `SetSongRandomizer` | setSongRandomizer.lua | `song_randomizer` mode string + `randomize_artists` |
+| `SetSongRandomizer` | setSongRandomizer.lua | `song_randomizer` table: `mode`, `artistScope`, `seeding`, `duplicates` |
 | `Disconnected` | disconnected.lua | AP server dropped |
 
 ### Authority split
 
 - **AP server** — what is in the world, and what has been received.
 - **Python `CotNDSaveData`** — derived CotND state: `zone_access`, `character_locations`,
-  `shop_locations`, `codex_locations`, `unlocked_npcs`, `extra_modes`. Persisted to AP
+  `shop_locations`, `codex_locations`, `extra_modes`. Persisted to AP
   DataStorage as `cotnd_{slot}_save`, keyed by seed with a `_v` sentinel.
+- **Caged NPCs** — placement comes from slot data (`caged_npc_locations`); whether a cage is
+  `freed` is the mod's own, set only by its "Caged X" location being checked. Receiving the
+  NPC *item* opens the lobby room and never touches the cage.
 - **This mod** — `diamonds` and `received_items` (listed in `MOD_OWNED` in
   [saveUpdate.lua](scripts/client/handlers/saveUpdate.lua)) because Python's copy runs
   ahead and would dedupe away items not yet applied. `characterLocations` and
@@ -512,17 +593,76 @@ rather than testing mode ids by hand.
   outside they are render-only.
 - **A song ending is a turn action, not presentation.** `SongEnd.lua` pushes
   `action.System.SONG_ENDED` into the client action buffer when the beatmap runs out.
-  `boss_7` is the only non-looping track, and that length is Return of the NecroDancer's
-  time limit — so any code that moves tracks around must force `loop = true`.
+  Zone songs don't loop, so a song's length is its floor's time limit; boss songs loop,
+  except `boss_7` (Return of the NecroDancer), whose length is that fight's time limit.
+  Code that moves tracks around must set `loop` from where the song plays, not where it
+  came from — forcing `loop = true` removes every floor's time limit.
 - **`event.musicTrack` at `order = "customMusic"` is the soundtrack seam.** It fires before
   the `zone`/`boss`/`special` handlers build filenames, so rewriting
   `ev.type/zone/floor/boss/artist` there carries beatmaps, layers, vocals and volumes with
-  it. It does not touch `currentLevel.getMusic()`, which is what NecroDancer's phase 2
-  gates on — see `apNecroDancerPhase2`.
+  it. The stock phase 2 layer is only added when `ev.boss` is the NecroDancer, so moving
+  that fight's track elsewhere drops it. The song shuffle itself lives in the CustomArtists
+  dependency (`SongRandomizer.lua`); AP only answers its `event.customArtistsSongRandomizer`
+  hook, in an AP context, with its own mode, artist scope, seeding, duplicates and seed.
+- **AP and CustomArtists keep separate song-randomizer settings.** `MODDING.md` in that mod is
+  the integration reference. AP's settings are synced with the slot (`songRandomizer` in
+  DataStorage, the `SetSongRandomizer` table) in CustomArtists' own vocabulary, and govern AP
+  runs and the AP lobby entirely, Off included. AP borrows `CustomArtists_SongRandomizerShrine`
+  for the lobby settings room and overrides its `CustomArtists_showSongRandomizerMenu` handler
+  for the copy in the AP lobby, which opens AP's own `AP_songRandomizer` menu
+  ([apSongRandomizerMenu.lua](scripts/menu/apSongRandomizerMenu.lua)); the pause menu and the
+  vanilla shrine keep CustomArtists' menu with no AP rows. Option hints are `customDesc`, read
+  by the engine's `settingsMenu.createDynamicFooter`. CustomArtists' `updateVisuals` handler
+  pins every shrine to *its* mode, so AP re-stamps `spriteSheet.frameX` at `sequence = 1` on the
+  shrine standing in the AP lobby segment. `FULLY_RANDOM` ignores `ev.seed`, so the multiworld
+  seed only reaches the shuffle through `PER_CHARACTER`. It is a declared dependency but can still
+  be switched off, and three touchpoints break then: a module-scope
+  `require "CustomArtists.scripts.…"` (guard with `pcall`), `object.spawn` of its shrine,
+  since `ecs.spawn` raises *"Unknown type"* (guard with `ecs.isValidEntityType`), and a handler
+  on one of *its* events — an event with handlers but no `orderedSelector` fails the load with
+  *"invalid event … specified for handler"*, so `apSongRandomizer` only adds its handler when
+  `pcall(require, …Randomizer)` succeeds. Overriding a handler name that never appears, filtering
+  `entitiesWithComponents` on an unregistered component, and keying a schema or menu handler on a
+  name that never appears are all inert.
+- **The lobby track is chosen before players reach the AP lobby.** `event.levelLoad`'s
+  `playLevelMusic` runs inside `gameStateLevel` order `"level"`, while `apLobby`'s teleport
+  sits at `"splitScreen"` — the last entry in that list — so anything keyed on where a player
+  is standing resolves against the *vanilla* lobby spawn. Restarting the track afterwards is
+  audible however short the crossfade, so answer for where players are *about to be* instead:
+  `apSongRandomizer` raises a flag at `"resetLevelVariables"` and drops it at `"splitScreen"`,
+  and the teleport's own condition is just `isSessionConnected()`. `setLobbyState` runs before
+  the `gameStateLevel` chain, so `gameState.isInLobby()` is already correct that early.
 - **Weapon shapes:** `customWeapons.registerShape` refuses `xmlTypes` from a mod, but
   stamping `weaponType` + the shape component + `weaponMaterial`/`weaponMaterialBase` via
   `entitySchemaLoadNamedEntity` achieves the same thing. See
   [zweihander.lua](scripts/weapons/zweihander.lua).
+- **A player's body has no player during its own spawn.** `Player.lua` spawns the character, then
+  calls `setControlledEntity`, so inside `objectSpawn` (where the initial inventory and every buff
+  is granted) `controllable.playerID` is 0. The id is in `playableCharacter.pendingPlayerID`;
+  anything keyed by player across the lobby → run boundary must fall back to it.
+- **The walkable lobby counts as in game.** It runs as the `IN_GAME` state with the lobby flag,
+  so `gameState.isInGame()` and `isInLobby()` are both true there; only `isInLobby()` tells it
+  apart from a run.
+- **A `character` is not necessarily somewhere you can stand.** When a Coral Riff tentacle
+  dies, `spawnDecorTentacle` places a `TentacleDecor` one column outside the arena, inside
+  the wall, and it carries `character`. Before moving a player onto a character's tile,
+  check the tile with `collision.check(x, y, mask(WALL, BORDER))`
+  ([swapTrap.lua](scripts/traps/traps/swapTrap.lua)).
+- **`descent.active` spans the level transition.** It is set on the stairs and cleared only
+  by `objectDescentArrive` on the next floor, so it is the simulated signal that a level change
+  is in flight. No trap lands while any player is descending; `trapHandler` keeps it queued
+  for the next floor.
+- **One HUD slot holds every countdown.** Tempo's `damageCountdown`, Chaunter's
+  `Sync_possessableTimer`, Coda's buff counter, DeathLink's `AP_damageCountdown` and the Timer
+  Trap's `AP_timerCountdown` all draw into element `damageCountdown`, and all keep running side
+  by side. Each source registers a provider with `apDamageCountdownHUD.register`
+  ([ui/apDamageCountdown.lua](scripts/ui/apDamageCountdown.lua)); once two show, or one that
+  is not `native`, `ownsSlot` is true. The native handlers then stand down, and the soonest
+  beat count draws in MEDIUM while the rest go small beside it, each in its own colour. Countdowns belong on the body the
+  player is driving (`player.getPlayerEntities()`), since `apCarryDamageCountdown` moves
+  them across possession with the remaining beats intact. A DeathLink that ends on a
+  possessed body also hits its `Sync_possessable.possessor`; the creature dying alone only
+  ejects Chaunter.
 
 ---
 
@@ -572,8 +712,8 @@ it down or delete it.
   over ones that fail open.
 - **Make edits with the Edit tool** — never through `sed`, heredocs, or inline scripts.
 - **Commit messages carry no Claude attribution** — no `Co-Authored-By` trailer.
-- **Naming:** components `AP_camelCase`; files `apThing.lua`; handler names alphanumeric
-  and descriptive (`apGrantInitialItems`); modules required as
+- **Naming:** components `AP_camelCase`; files `apThing.lua`; handler names descriptive
+  and unique per event (`apGrantInitialItems`); modules required as
   `require("AP.scripts.…")` with library requires listed first, alphabetically, then AP
   requires.
 - **Logging** goes through `require("AP.scripts.utils.log").apLog(msg, "warning")`.

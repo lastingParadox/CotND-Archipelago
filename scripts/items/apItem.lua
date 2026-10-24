@@ -3,7 +3,7 @@ local flyaway = require "necro.game.system.Flyaway"
 local apGrants = require("AP.scripts.items.apGrants")
 local apItemFactory = require("AP.scripts.items.apItemFactory")
 
--- Someone else's item, drawn by classification; ordered, since that fixes entity type IDs.
+-- Someone else's item, drawn by classification.
 local PLACEHOLDERS = {
     { name = "AP_ItemFiller",      sprite = "filler" },
     { name = "AP_ItemProgression", sprite = "progression" },

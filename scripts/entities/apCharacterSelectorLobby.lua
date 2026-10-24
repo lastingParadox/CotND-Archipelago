@@ -172,11 +172,13 @@ event.render.add("characterPreviewAP", { order = "characterPreview", sequence = 
                 local locked = disabled or isCharacterLocked(preview.name)
                 local character = apCharacters.cotNDCharToAPLocation(preview.name)
                 local missingRequirementLock = not disabled and progression.getCharacters(character) and getMissingRequiredItems(preview.name) ~= nil
+                local blacklisted = progression.getCharacterBlacklist(character)
 
                 apPreview.draw(preview, {
                     entity = entity,
                     silhouette = locked,
-                    indicatorColor = apPreview.indicatorColor(disabled, missingRequirementLock),
+                    grayscale = not locked and blacklisted,
+                    indicatorColor = apPreview.indicatorColor(disabled or blacklisted, missingRequirementLock),
                 })
             end
         end

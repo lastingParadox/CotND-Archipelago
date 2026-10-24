@@ -85,19 +85,23 @@ local function errorNotificationHostOnly(entity, positionEntity)
     return errorNotification(entity, L("Host only!", "error.localPlayerNotLobbyHost"), positionEntity)
 end
 
-local function getModeSaveDataById(modeID)
-    local supportedModes = {
-        [8] = "No Return",
-        [9] = "Hard",
-        [10] = "Phasing",
-        [11] = "Randomizer",
-        [12] = "Mystery",
-        [13] = "No Beat",
-        [20] = "Double Tempo",
-        [23] = "Low Percent"
-    }
+apExtraModeConfiguration.SUPPORTED_MODES = {
+    [8] = "No Return",
+    [9] = "Hard",
+    [10] = "Phasing",
+    [11] = "Randomizer",
+    [12] = "Mystery",
+    [13] = "No Beat",
+    [20] = "Double Tempo",
+    [23] = "Low Percent",
+}
 
-    return progression.getExtraModes(supportedModes[modeID])
+local function getModeSaveDataById(modeID)
+    local name = apExtraModeConfiguration.SUPPORTED_MODES[modeID]
+    -- getExtraModes(nil) hands back the whole table, which would read as unlocked.
+    if not name then return nil end
+
+    return progression.getExtraModes(name)
 end
 
 local function isExtraModeLocked(mode)

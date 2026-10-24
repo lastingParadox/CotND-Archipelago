@@ -1,11 +1,11 @@
 {
 	"namespace": "AP",
 	"displayName": "Archipelago Redux",
-	"version": "4.1.2",
+	"version": "4.2.0",
 	"synchronyVersion": "4.1.1",
 	"description": "Updated Synchrony integration with Archipelago. Randomize your progression with a custom lobby and acquire items for other players playing alongside you!\n\nNote: Online multiplayer is currently in a BETA state! If you find any issues, please report them to me! Be warned!",
 	"author": "lastingParadox",
-	"dependencies": {},
+	"dependencies": {"CustomArtists_io_6387365": "1.0.2"},
 	"api": {"scriptPath":""},
 	"icon": "APIcon.png",
 	"banner": "APBanner.png",

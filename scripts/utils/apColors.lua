@@ -20,6 +20,9 @@ local apColors = {
     lowPercent  = color.rgb(51, 51, 170),
     chatBadge   = color.rgb(49, 107, 132),
     trapStatus  = color.rgb(255, 96, 96),
+
+    deathLinkCountdown  = color.rgb(120, 120, 120),
+    possessionCountdown = color.rgb(89, 198, 101),
 }
 
 -- Names not defined above fall through to the engine's Color module.

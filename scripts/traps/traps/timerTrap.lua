@@ -9,15 +9,15 @@ trapSystem.define({
     name    = "TimerTrap",
     flyaway = "Timer!",
     apply   = function(ctx)
-        local entity = ctx.entity
-        if not entity.AP_damageCountdown then return false end
-        if entity.AP_damageCountdown.active then return end
+        local countdown = ctx.entity.AP_timerCountdown
+        if not countdown then return false end
+        if countdown.active then return end
 
-        entity.AP_damageCountdown.countdown      = COUNTDOWN
-        entity.AP_damageCountdown.damage         = DAMAGE
-        entity.AP_damageCountdown.countdownReset = COUNTDOWN
-        entity.AP_damageCountdown.killerName     = "Timer Trap"
-        entity.AP_damageCountdown.type           = APFlags.DAMAGE_AP_TRAP
-        entity.AP_damageCountdown.active         = true
+        countdown.countdown      = COUNTDOWN
+        countdown.damage         = DAMAGE
+        countdown.countdownReset = COUNTDOWN
+        countdown.killerName     = "Timer Trap"
+        countdown.type           = APFlags.DAMAGE_AP_TRAP
+        countdown.active         = true
     end,
 })

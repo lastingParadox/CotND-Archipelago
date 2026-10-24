@@ -1,5 +1,14 @@
+local utils = require "system.utils.Utilities"
+
 local apLog = require("AP.scripts.utils.log").apLog
 local apStorage = require("AP.scripts.client.storage")
+
+local SONG_RANDOMIZER_DEFAULTS = {
+    mode = "OFF",
+    artistScope = "PER_RUN",
+    seeding = "PER_CHARACTER",
+    duplicates = "MINIMAL",
+}
 
 local function attach(progression)
     function progression.getSeedName()
@@ -10,6 +19,11 @@ local function attach(progression)
     function progression.getPlayerName()
         if next(apStorage.saveData) == nil then return "" end
         return apStorage.playerName
+    end
+
+    -- 0 until a session connects, so it is always safe to hash or format.
+    function progression.getSlot()
+        return apStorage.slot or 0
     end
 
     function progression.getGoal()
@@ -50,6 +64,27 @@ local function attach(progression)
         return apStorage.saveData.shrineChecks == true
     end
 
+    function progression.getEnemyChecks()
+        return apStorage.saveData.enemyChecks == true
+    end
+
+    -- The location an entity type's first kill checks, or nil if it is not one of them.
+    function progression.getEnemyLocation(entityName)
+        return (apStorage.saveData.enemyLocations or {})[entityName]
+    end
+
+    -- Entity type of each enemy check, mapped to the earliest zone it can be fought in.
+    function progression.getEnemyZones()
+        return apStorage.saveData.enemyZones or {}
+    end
+
+    function progression.isEnemyDefeated(entityName)
+        local location = progression.getEnemyLocation(entityName)
+        local defeated = apStorage.saveData.characterLocations["Enemies"]
+
+        return location ~= nil and defeated ~= nil and defeated[location] == true
+    end
+
     -- Ordered {id, category} list of everything this slot can receive.
     function progression.getItemRoom()
         return apStorage.saveData.itemRoom or {}
@@ -77,6 +112,14 @@ local function attach(progression)
         local rate = apStorage.saveData.goldToDiamondRate
         if rate == nil then return 50 end
         return rate
+    end
+
+    -- AP runs' song randomizer settings, in Custom Artists' own terms: mode, artistScope, seeding, duplicates.
+    function progression.getSongRandomizer()
+        local settings = apStorage.saveData.songRandomizer
+        local copy = type(settings) == "table" and utils.fastCopy(settings) or {}
+
+        return utils.mergeDefaults(SONG_RANDOMIZER_DEFAULTS, copy)
     end
 
     function progression.getExtraModes(mode)

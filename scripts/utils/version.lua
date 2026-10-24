@@ -1,7 +1,7 @@
 local resources = require "necro.client.Resources"
 local netplay = require "necro.network.Netplay"
 
-local MOD_VERSION_FALLBACK = "4.0.0"
+local MOD_VERSION_FALLBACK = "4.2.0"
 
 local function getModVersion()
     local modList = resources.getData(netplay.Resource.MOD_LIST)
@@ -18,7 +18,7 @@ local function getModVersion()
 end
 
 -- Minimum apworld release (archipelago.json's world_version) this mod build works with.
-local MIN_APWORLD_VERSION = "0.8.0"
+local MIN_APWORLD_VERSION = "0.8.4"
 
 local function parseVersion(str)
     local parts = {}

@@ -3,10 +3,12 @@ local customEntities = require("necro.game.data.CustomEntities")
 local ecs = require "system.game.Entities"
 local itemPickup = require "necro.game.item.ItemPickup"
 local object = require("necro.game.object.Object")
+local player = require "necro.game.character.Player"
 local rng = require "necro.game.system.RNG"
 local tile = require "necro.game.tile.Tile"
 local tileTypes = require "necro.game.tile.TileTypes"
 local turn = require "necro.cycles.Turn"
+local utils = require "system.utils.Utilities"
 local visualUpdate = require "necro.cycles.VisualUpdate"
 
 local apClient = require("AP.scripts.client.client")
@@ -15,7 +17,6 @@ local apItems = require("AP.scripts.utils.apItems")
 local apLocationItem = require("AP.scripts.utils.apLocationItem")
 local apLog = require("AP.scripts.utils.log").apLog
 local apStorage = require("AP.scripts.client.storage")
-local player = require "necro.game.character.Player"
 local progression = require("AP.scripts.client.progression")
 local types = require("AP.scripts.utils.types")
 
@@ -23,11 +24,8 @@ local APShopSlot = {}
 
 local janitorSlots = {}
 local dealerSlots = {}
-local itemCandidates = nil
-local lastItemsKey = nil
-local lastBanKey = nil
-janitorSlots, dealerSlots, itemCandidates, lastItemsKey, lastBanKey = script.persist(function()
-    return janitorSlots, dealerSlots, itemCandidates, lastItemsKey, lastBanKey
+janitorSlots, dealerSlots = script.persist(function()
+    return janitorSlots, dealerSlots
 end)
 
 customEntities.register({
@@ -39,18 +37,53 @@ customEntities.register({
     }
 })
 
-local function removeSlot(item, npc)
-    local slotList = npc == "Diamonddealer" and dealerSlots or janitorSlots
-    local indexToRemove = nil
-    for i, value in ipairs(slotList) do
-        if value == item then
-            indexToRemove = i
-            break
-        end
-    end
+local TILE_HEIGHT = 24
+local SOLID_WARE = collision.Type.mask(collision.Type.PLAYER, collision.Type.ITEM)
 
-    if indexToRemove ~= nil then table.remove(slotList, indexToRemove) end
-end
+local CODEX_LOCATIONS = {
+    DragonLore = "Dragon Lore",
+    TrapLore   = "Trap Lore",
+    BombLore   = "Bomb Lore",
+    Murder     = "How to Get Away with Murder",
+}
+
+local UNSELLABLE = { "consumableHeal", "playableCharacter", "greetable", "itemLobbyProgressionUnlock", "AP_material" }
+
+local ALT_NPCS = {
+    Janitor = {
+        seed = 10,
+        priceTag = "AP_PriceTagLobbyRemoveFromPool",
+        slots = function() return janitorSlots end,
+        excluded = function() return progression.getBannedItems() or {} end,
+        price = function() return 1 end,
+        purchase = function(ware)
+            progression.addBannedItem(ware.name)
+            object.delete(ware)
+        end,
+    },
+    Diamonddealer = {
+        seed = 20,
+        priceTag = "AP_PriceTagLobbyGrantOnce",
+        composites = true,
+        -- A material is a run-start item nobody can equip on its own.
+        unsellable = { "AP_material" },
+        slots = function() return dealerSlots end,
+        excluded = function() return progression.getNextRunItems() or {} end,
+        price = function(item)
+            local diamonds = (item.itemDiamondDealable and item.itemDiamondDealable.diamonds)
+                or (item.itemPrice and item.itemPrice.diamonds) or 1
+            return diamonds ~= 0 and diamonds or 5
+        end,
+        purchase = function(ware)
+            progression.addNextRunItem(ware.name)
+            for _, playerEntity in ipairs(player.getPlayerEntities()) do
+                apInventory.equipNextRunItems(playerEntity, progression)
+            end
+        end,
+    },
+}
+
+-- Rows
 
 local function getFirstUncheckedSlotInSection(section)
     if not section or not section.Slots then return nil, nil end
@@ -66,10 +99,27 @@ local function getFirstUncheckedSlotInSection(section)
         end
     end
 
-    return nil, nil -- no unchecked slot
+    return nil, nil
 end
 
-local TILE_HEIGHT = 24
+local function slotForLocationCode(section, locationCode)
+    if not (section and section.Slots and locationCode and locationCode ~= "") then return nil, nil end
+
+    for key, slot in pairs(section.Slots) do
+        if tostring(slot.LocationCode) == locationCode then
+            return slot, tonumber(key)
+        end
+    end
+
+    return nil, nil
+end
+
+local function positionSection(slotEntity)
+    local npcSection = progression.getShopLocations(slotEntity.AP_shopSlot.npc)
+    return npcSection and npcSection[slotEntity.AP_shopSlot.position]
+end
+
+-- Spawning
 
 local function alignShopItemSprite(item)
     if not (item and item.sprite and item.positionalSprite) then return end
@@ -80,50 +130,42 @@ local function alignShopItemSprite(item)
     end
 end
 
-local function spawnAPLobbyShopItemForSlot(slotEntity)
-    local npcSection = progression.getShopLocations(slotEntity.AP_shopSlot.npc)
-    if not npcSection then return end
+-- Puts a ware on the slot, tagged back to it.
+local function spawnWare(slotEntity, name, args, solid)
+    args = args or {}
+    args.AP_locationItem = args.AP_locationItem or {}
+    args.AP_locationItem.slot = slotEntity
 
-    local positionSection = npcSection[slotEntity.AP_shopSlot.position]
-    if not positionSection then return end
+    local item = object.spawn(name, slotEntity.position.x, slotEntity.position.y, args)
+    slotEntity.AP_shopSlot.item = item
+    alignShopItemSprite(item)
 
-    local shopItem, index = getFirstUncheckedSlotInSection(positionSection)
-    if not shopItem then return end
+    if solid then collision.setMask(item, SOLID_WARE) end
 
-    -- Shop stock items are needed for normal shop slot item spawn
-    if progression.getShopStock() < index - 1 then return end
+    return item
+end
 
-    local itemData = apItems.shopItemToObjectData(shopItem)
-    if not itemData then
-        apLog("Failed to map shop item data for NPC " .. slotEntity.AP_shopSlot.npc, "warning")
-        return
+local function tagPrice(item, slotEntity, priceTag, cost)
+    item.sale.priceTag = object.spawn(priceTag, slotEntity.position.x, slotEntity.position.y,
+        { priceTagCostCurrency = { cost = cost } })
+end
+
+-- Object data for a location's ware, tagged with its code, or nil when it cannot be mapped.
+local function locationWareData(located, label)
+    local itemData = apItems.shopItemToObjectData(located)
+    if not (itemData and type(itemData.name) == "string" and itemData.name ~= "") then
+        apLog("Failed to map shop item for " .. label .. ", location " .. tostring(located.LocationCode), "warning")
+        return nil
     end
 
     itemData.args = itemData.args or {}
     itemData.args.AP_locationItem = itemData.args.AP_locationItem or {}
-    itemData.args.AP_locationItem.slot = slotEntity
-    itemData.args.AP_locationItem.locationCode = tostring(shopItem.LocationCode or "")
+    itemData.args.AP_locationItem.locationCode = tostring(located.LocationCode or "")
 
-    if type(itemData.name) ~= "string" or itemData.name == "" then
-        apLog("Invalid shop item type for NPC " .. slotEntity.AP_shopSlot.npc ..
-            ", location " .. tostring(shopItem.LocationCode), "warning")
-        return
-    end
+    return itemData
+end
 
-    apLog("Spawning shop item: " .. itemData.name .. " for NPC: " ..
-        slotEntity.AP_shopSlot.npc .. " at position: " .. slotEntity.AP_shopSlot.position)
-
-    local item = object.spawn(itemData.name,
-        slotEntity.position.x, slotEntity.position.y,
-        itemData.args)
-    slotEntity.AP_shopSlot.item = item
-    alignShopItemSprite(item)
-
-    collision.setMask(item, collision.Type.mask(
-        collision.Type.PLAYER,
-        collision.Type.ITEM
-    ))
-
+local function locationPrice(item, shopItem, itemData)
     local pricing = progression.getPricing()
     local classification = pricing and pricing.type or types.PriceRandomization.VANILLA
     local price = 0
@@ -134,46 +176,36 @@ local function spawnAPLobbyShopItemForSlot(slotEntity)
     end
 
     if not price or price == 0 then
-        local seedName = progression.getSeedName()
-        price = apItems.getPriceForItem(
-            pricing,
-            shopItem.LocationCode,
-            shopItem.Classification or 0,
-            seedName
-        ) or itemData.price or 1
+        price = apItems.getPriceForItem(pricing, shopItem.LocationCode, shopItem.Classification or 0,
+            progression.getSeedName()) or itemData.price or 1
     end
 
-    item.sale.priceTag = object.spawn("AP_PriceTagLobbyUnlock",
-        slotEntity.position.x, slotEntity.position.y,
-        { priceTagCostCurrency = { cost = price } }
-    )
+    return price
 end
 
-local UNSELLABLE = { "consumableHeal", "playableCharacter", "greetable", "itemLobbyProgressionUnlock", "AP_material" }
+local function spawnShopWare(slotEntity)
+    local shopItem, index = getFirstUncheckedSlotInSection(positionSection(slotEntity))
+    if not shopItem or progression.getShopStock() < index - 1 then return end
 
-local ALT_NPCS = {
-    Janitor = {
-        seed = 10,
-        priceTag = "AP_PriceTagLobbyRemoveFromPool",
-        slots = function() return janitorSlots end,
-        excluded = function() return progression.getBannedItems() or {} end,
-        price = function() return 1 end,
-    },
-    Diamonddealer = {
-        seed = 20,
-        priceTag = "AP_PriceTagLobbyGrantOnce",
-        composites = true,
-        -- A material is a run-start item nobody can equip on its own.
-        unsellable = { "AP_material" },
-        slots = function() return dealerSlots end,
-        excluded = function() return progression.getNextRunItems() or {} end,
-        price = function(item)
-            local diamonds = (item.itemDiamondDealable and item.itemDiamondDealable.diamonds)
-                or (item.itemPrice and item.itemPrice.diamonds) or 1
-            return diamonds ~= 0 and diamonds or 5
-        end,
-    },
-}
+    local itemData = locationWareData(shopItem, slotEntity.AP_shopSlot.npc)
+    if not itemData then return end
+
+    apLog("Spawning shop item: " .. itemData.name .. " for NPC: " ..
+        slotEntity.AP_shopSlot.npc .. " at position: " .. slotEntity.AP_shopSlot.position)
+
+    local item = spawnWare(slotEntity, itemData.name, itemData.args, true)
+    tagPrice(item, slotEntity, "AP_PriceTagLobbyUnlock", locationPrice(item, shopItem, itemData))
+end
+
+local function spawnCodexWare(slotEntity)
+    local codexLocation = progression.getCodexLocations(slotEntity.AP_shopSlot.type)
+    if not (codexLocation and codexLocation.Item and not codexLocation.Checked) then return end
+
+    local itemData = locationWareData(codexLocation, tostring(slotEntity.AP_shopSlot.type))
+    if not itemData then return end
+
+    spawnWare(slotEntity, itemData.name, itemData.args, true)
+end
 
 local function sellable(proto, npc)
     if not (proto and proto.item) then return false end
@@ -239,10 +271,10 @@ local function pickAltItem(candidates, npc)
     return fallback
 end
 
-local function spawnAPLobbyAltItemForSlot(slotEntity, npcName)
+local function spawnAltWare(slotEntity, npcName)
     local npc = ALT_NPCS[npcName]
     local itemsList = progression.getItems()
-    if not (npc and itemsList and next(itemsList)) then return end
+    if not (itemsList and next(itemsList)) then return end
 
     local excluded = npc.excluded()
     local candidates = {}
@@ -266,120 +298,116 @@ local function spawnAPLobbyAltItemForSlot(slotEntity, npcName)
 
     table.insert(npc.slots(), chosen)
 
-    local item = object.spawn(chosen, slotEntity.position.x, slotEntity.position.y,
-        { AP_locationItem = { slot = slotEntity } })
-    slotEntity.AP_shopSlot.item = item
-    alignShopItemSprite(item)
-
-    item.sale.priceTag = object.spawn(npc.priceTag,
-        slotEntity.position.x, slotEntity.position.y,
-        { priceTagCostCurrency = { cost = npc.price(item) } }
-    )
+    local item = spawnWare(slotEntity, chosen)
+    tagPrice(item, slotEntity, npc.priceTag, npc.price(item))
 end
 
-local function spawnCodexItemForSlot(slotEntity)
-    local codexLocation = progression.getCodexLocations(slotEntity.AP_shopSlot.type)
-    if not (codexLocation and codexLocation.Item and not codexLocation.Checked) then return end
+local function spawnVictoryWare(slotEntity)
+    if (progression.getCharacterLocations("ExpensivePurchase") or {})["Completed"] then return end
 
-    local itemData = apItems.shopItemToObjectData(codexLocation)
-    if not itemData then
-        apLog("Failed to map codex item data for " .. tostring(slotEntity.AP_shopSlot.type), "warning")
-        return
-    end
-
-    itemData.args = itemData.args or {}
-    itemData.args.AP_locationItem = itemData.args.AP_locationItem or {}
-    itemData.args.AP_locationItem.slot = slotEntity
-    itemData.args.AP_locationItem.locationCode = tostring(codexLocation.LocationCode or "")
-
-    if type(itemData.name) ~= "string" or itemData.name == "" then
-        apLog("Invalid codex item type for " .. tostring(slotEntity.AP_shopSlot.type) ..
-            ", location " .. tostring(codexLocation.LocationCode), "warning")
-        return
-    end
-
-    local item = object.spawn(itemData.name,
-        slotEntity.position.x, slotEntity.position.y,
-        itemData.args)
-    slotEntity.AP_shopSlot.item = item
-    alignShopItemSprite(item)
-
-    collision.setMask(item, collision.Type.mask(
-        collision.Type.PLAYER,
-        collision.Type.ITEM
-    ))
+    local item = spawnWare(slotEntity, "AP_VictoryItem", nil, true)
+    tagPrice(item, slotEntity, "AP_PriceTagVictory", progression.getExpensivePurchasePrice())
 end
+
+-- Buying: each returns true once the ware is paid for.
+
+local function charge(ware)
+    local tag = ware.sale and ecs.getEntityByID(ware.sale.priceTag)
+    if tag then
+        progression.changeDiamonds(-(tag.priceTagCostCurrency.cost or 1))
+    end
+end
+
+local function buyLocationWare(ware, located, locationName)
+    if not located or located.Checked then return false end
+    if not apLocationItem.consume(located, locationName) then return false end
+
+    charge(ware)
+    object.delete(ware)
+
+    return true
+end
+
+local function buyShopWare(ware, slot)
+    local shopItem, index = slotForLocationCode(positionSection(slot), ware.AP_locationItem.locationCode)
+
+    return buyLocationWare(ware, shopItem,
+        slot.AP_shopSlot.npc .. " - " .. slot.AP_shopSlot.position .. " Shop Item " .. tostring(index))
+end
+
+local function buyCodexWare(ware, slot)
+    local codexKey = slot.AP_shopSlot.type
+
+    return buyLocationWare(ware, progression.getCodexLocations(codexKey), CODEX_LOCATIONS[codexKey])
+end
+
+local function buyAltWare(ware, npcName)
+    local npc = ALT_NPCS[npcName]
+
+    charge(ware)
+    npc.purchase(ware)
+    utils.arrayRemove(npc.slots(), ware.name)
+
+    return true
+end
+
+local function buyVictoryWare(ware)
+    charge(ware)
+    apStorage.saveData.characterLocations["ExpensivePurchase"] = { Completed = true }
+    progression.calculateGoalCompletion(true)
+    object.delete(ware)
+
+    return true
+end
+
+local LOCATION_SHOP = { spawn = spawnShopWare, buy = buyShopWare, notifyOutOfStock = true }
 
 local NPCHandlers = {
+    Hephaestus         = LOCATION_SHOP,
+    ["Dungeon Master"] = LOCATION_SHOP,
+    Merlin             = LOCATION_SHOP,
+    Codex = {
+        spawn = spawnCodexWare,
+        buy = buyCodexWare,
+        noRefresh = true,
+    },
     Janitor = {
-        spawn = function(slot) return spawnAPLobbyAltItemForSlot(slot, "Janitor") end,
-        notifyOutOfStock = false,
-        noRefresh = true
+        spawn = function(slot) return spawnAltWare(slot, "Janitor") end,
+        buy = function(ware) return buyAltWare(ware, "Janitor") end,
+        noRefresh = true,
     },
     Diamonddealer = {
-        spawn = function(slot) return spawnAPLobbyAltItemForSlot(slot, "Diamonddealer") end,
-        notifyOutOfStock = false,
-        noRefresh = true
-    },
-    Codex = {
-        spawn = function(slot) return spawnCodexItemForSlot(slot) end,
-        notifyOutOfStock = false,
-        noRefresh = true
-    },
-    Hephaestus = {
-        spawn = spawnAPLobbyShopItemForSlot,
-        notifyOutOfStock = true
-    },
-    ["Dungeon Master"] = {
-        spawn = spawnAPLobbyShopItemForSlot,
-        notifyOutOfStock = true
-    },
-    Merlin = {
-        spawn = spawnAPLobbyShopItemForSlot,
-        notifyOutOfStock = true
+        spawn = function(slot) return spawnAltWare(slot, "Diamonddealer") end,
+        buy = function(ware) return buyAltWare(ware, "Diamonddealer") end,
+        noRefresh = true,
     },
     VictoryItem = {
-        spawn = function(slot)
-            if (progression.getCharacterLocations("ExpensivePurchase") or {})["Completed"] then return end
-
-            local item = object.spawn("AP_VictoryItem", slot.position.x, slot.position.y, {
-                AP_locationItem = { slot = slot }
-            })
-            slot.AP_shopSlot.item = item
-            alignShopItemSprite(item)
-
-            collision.setMask(item, collision.Type.mask(
-                collision.Type.PLAYER,
-                collision.Type.ITEM
-            ))
-
-            item.sale.priceTag = object.spawn("AP_PriceTagVictory",
-                slot.position.x, slot.position.y,
-                { priceTagCostCurrency = { cost = progression.getExpensivePurchasePrice() } }
-            )
-        end,
-        notifyOutOfStock = false,
+        spawn = spawnVictoryWare,
+        buy = buyVictoryWare,
         noRefresh = true,
     },
 }
 
 local function spawnShopItem(slotEntity)
-    if not apClient.isSessionConnected() then
+    if not apClient.isSessionConnected() then return end
+
+    local npc = slotEntity.AP_shopSlot.npc
+    local handler = NPCHandlers[npc]
+    if not handler then
+        apLog("No shop handler for NPC " .. tostring(npc), "warning")
         return
     end
-    local npc = slotEntity.AP_shopSlot.npc
-    local handler = NPCHandlers[npc] or NPCHandlers.default
 
     handler.spawn(slotEntity)
 
-
-    -- Out-of-stock handling (shared)
     if handler.notifyOutOfStock then
-        local tileName = tileTypes.getTileInfo(tile.get(slotEntity.position.x, slotEntity.position.y)).name
+        local x, y = slotEntity.position.x, slotEntity.position.y
+        local tileName = tileTypes.getTileInfo(tile.get(x, y)).name
+
         if not ecs.entityExists(slotEntity.AP_shopSlot.item) then
-            tile.setType(slotEntity.position.x, slotEntity.position.y, "OutOfStockFloor")
+            tile.setType(x, y, "OutOfStockFloor")
         elseif tileName == "OutOfStockFloor" then
-            tile.setType(slotEntity.position.x, slotEntity.position.y, "Floor")
+            tile.setType(x, y, "Floor")
         end
     end
 
@@ -388,64 +416,44 @@ end
 
 function APShopSlot.refreshShopSlots(npcFilter)
     for slot in ecs.entitiesWithComponents({ "AP_shopSlot" }) do
-        if npcFilter and slot.AP_shopSlot.npc ~= npcFilter then goto continue end
+        local npc = slot.AP_shopSlot.npc
 
-        local item = ecs.getEntityByID(slot.AP_shopSlot.item)
-        if item then
-            object.delete(item)
-            removeSlot(item.name, slot.AP_shopSlot.npc)
-            visualUpdate.trigger()
+        if not npcFilter or npc == npcFilter then
+            local item = ecs.getEntityByID(slot.AP_shopSlot.item)
+            if item then
+                object.delete(item)
+                if ALT_NPCS[npc] then utils.arrayRemove(ALT_NPCS[npc].slots(), item.name) end
+                visualUpdate.trigger()
+            end
+
+            spawnShopItem(slot)
         end
-
-        spawnShopItem(slot)
-        ::continue::
     end
 end
 
 event.tick.add("apRefreshShopSlots", { order = "lobby", sequence = 3 }, function()
     for slot in ecs.entitiesWithComponents({ "AP_shopSlot" }) do
-        local npc = slot.AP_shopSlot.npc
-        local handler = NPCHandlers[npc]
-        if handler.noRefresh then goto continue end
-        if handler and handler.refresh then
-            handler.refresh(slot)
-        elseif not ecs.entityExists(slot.AP_shopSlot.item) and
-            not collision.check(slot.position.x, slot.position.y, collision.Type.PLAYER) then
+        local handler = NPCHandlers[slot.AP_shopSlot.npc]
+
+        if handler and not handler.noRefresh
+            and not ecs.entityExists(slot.AP_shopSlot.item)
+            and not collision.check(slot.position.x, slot.position.y, collision.Type.PLAYER) then
             spawnShopItem(slot)
-            if ecs.entityExists(slot.AP_shopSlot.item) then visualUpdate.trigger() end
         end
-        ::continue::
     end
 end)
 
--- Clear state on level load
 event.levelLoad.add("apClearAltSlots", { order = "lobbyLevel" }, function()
     janitorSlots, dealerSlots = {}, {}
 end)
 
--- Spawn on entity creation
 event.objectSpawn.add("apSpawnShopItem", { filter = "AP_shopSlot", order = "items" }, function(ev)
     spawnShopItem(ev.entity)
 end)
 
--- Populate shop items on connect
 event.apConnect.add("apPopulateShopItems", { order = "connected", sequence = 1 }, function(ev)
     if ev.status == "Connected" then APShopSlot.refreshShopSlots() end
 end)
-
-local function codexKeyToLocationName(codexKey)
-    if codexKey == "DragonLore" then
-        return "Dragon Lore"
-    elseif codexKey == "TrapLore" then
-        return "Trap Lore"
-    elseif codexKey == "BombLore" then
-        return "Bomb Lore"
-    elseif codexKey == "Murder" then
-        return "How to Get Away with Murder"
-    end
-    return nil
-end
-
 
 event.objectUpdateTargetability.add("apShopItemNoTargeting", { order = "apply", filter = "AP_locationItem", sequence = -1 },
     function(ev)
@@ -458,65 +466,18 @@ event.objectUpdateTargetability.add("apShopItemNoTargeting", { order = "apply", 
         end
     end)
 
--- Item pickup event
 event.objectTryCollectItem.add("apPurchaseShopItem", { order = "priceTag", sequence = 1 }, function(ev)
-    if not (apClient.isSessionConnected() and ev.result == itemPickup.Result.SUCCESS and ev.item.AP_locationItem and ev.item.AP_locationItem.slot ~= 0) then
-        return
+    if not (apClient.isSessionConnected() and ev.result == itemPickup.Result.SUCCESS) then return end
+
+    local tag = ev.item.AP_locationItem
+    local slot = tag and tag.slot ~= 0 and ecs.getEntityByID(tag.slot)
+    local handler = slot and slot.AP_shopSlot and NPCHandlers[slot.AP_shopSlot.npc]
+    if not handler then return end
+
+    if handler.buy(ev.item, slot) then
+        -- Untagged once bought, so a repeated pickup of the same ware cannot buy it again.
+        tag.slot = 0
     end
-
-    local slot = ecs.getEntityByID(ev.item.AP_locationItem.slot)
-    local npc = slot.AP_shopSlot.npc
-    if npc == "Janitor" or npc == "Diamonddealer" then
-        progression.changeDiamonds(-(ecs.getEntityByID(ev.item.sale.priceTag).priceTagCostCurrency.cost or 1))
-
-        if npc == "Janitor" then
-            progression.addBannedItem(ev.item.name)
-            object.delete(ev.item)
-        elseif slot.AP_shopSlot.npc == "Diamonddealer" then
-            progression.addNextRunItem(ev.item.name)
-            for _, playerEntity in ipairs(player.getPlayerEntities()) do
-                apInventory.equipNextRunItems(playerEntity, progression)
-            end
-        end
-
-        removeSlot(ev.item.name, npc)
-        return
-    end
-
-    if npc == "VictoryItem" then
-        if ev.item.sale and ev.item.sale.priceTag ~= 0 then
-            progression.changeDiamonds(-(ecs.getEntityByID(ev.item.sale.priceTag).priceTagCostCurrency.cost or 1))
-        end
-        apStorage.saveData.characterLocations["ExpensivePurchase"] = { Completed = true }
-        progression.calculateGoalCompletion(true)
-        object.delete(ev.item)
-        return
-    end
-
-    local shopItem, locationName = nil, nil
-
-    if npc == "Codex" then
-        shopItem = progression.getCodexLocations(slot.AP_shopSlot.type)
-        locationName = codexKeyToLocationName(slot.AP_shopSlot.type)
-    else
-        local npcSection = progression.getShopLocations(npc)
-        if not npcSection then return end
-
-        local positionSection = npcSection[slot.AP_shopSlot.position]
-        if not positionSection then return end
-
-        local index
-        shopItem, index = getFirstUncheckedSlotInSection(positionSection)
-        locationName = npc .. " - " .. slot.AP_shopSlot.position .. " Shop Item " .. tostring(index)
-    end
-
-    if not apLocationItem.consume(shopItem, locationName) then return end
-
-    if ev.item.sale and ev.item.sale.priceTag ~= 0 then
-        progression.changeDiamonds(-(ecs.getEntityByID(ev.item.sale.priceTag).priceTagCostCurrency.cost or 1))
-    end
-
-    object.delete(ev.item)
 end)
 
 return APShopSlot

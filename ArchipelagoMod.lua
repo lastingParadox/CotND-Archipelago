@@ -8,6 +8,7 @@ local textPool = require("necro.config.i18n.TextPool")
 local APFlags = require("AP.scripts.utils.flags")
 
 components.register({
+    AP_altVocalist = {},
     AP_currency = {
         components.constant.string("currencyType", currency.Type.GOLD),
         components.field.float("value", 0),
@@ -18,6 +19,14 @@ components.register({
         components.field.int("countdownReset", 0),
         components.field.string("killerName", "DeathLink"),
         components.field.int("countdown", 24),
+        components.field.bool("active", false)
+    },
+    AP_timerCountdown = {
+        components.field.int("damage", 1),
+        components.field.int("type", APFlags.DAMAGE_AP_TRAP),
+        components.field.int("countdownReset", 16),
+        components.field.string("killerName", "Timer Trap"),
+        components.field.int("countdown", 16),
         components.field.bool("active", false)
     },
     AP_deathlinkShrine = {},
@@ -120,7 +129,8 @@ components.register({
     },
     AP_itemShowcase = {
         components.field.bool("active", false),
-        components.field.string("item", "")
+        components.field.string("item", ""),
+        components.field.string("category", "")
     },
     AP_labelLobby = {
         components.field.entityID("topLabel"),
@@ -247,11 +257,23 @@ textPool.register("Archipelago Item Pool", "mod.AP.lobby.itemHub")
 textPool.register("Here you can find all items you've\nreceived in your AP World", "mod.AP.lobby.itemHubHint")
 textPool.register("Archipelago", "mod.AP.lobby.itemHub.apSection")
 textPool.register("Back to\nItem Hub", "mod.AP.lobby.stairBackHub")
+textPool.register("Enemy Room", "mod.AP.lobby.enemyRoom")
+textPool.register("Archipelago Enemies", "mod.AP.lobby.enemyHub")
+textPool.register("Here you can find every enemy\nyour AP World asks you to defeat", "mod.AP.lobby.enemyHubHint")
+textPool.register("Back to\nEnemy Hub", "mod.AP.lobby.stairBackEnemyHub")
+textPool.register("Zone 1", "mod.AP.lobby.enemyCat.zone1")
+textPool.register("Zone 2", "mod.AP.lobby.enemyCat.zone2")
+textPool.register("Zone 3", "mod.AP.lobby.enemyCat.zone3")
+textPool.register("Zone 4", "mod.AP.lobby.enemyCat.zone4")
+textPool.register("Zone 5", "mod.AP.lobby.enemyCat.zone5")
+textPool.register("Minibosses", "mod.AP.lobby.enemyCat.miniboss")
+textPool.register("Track what you've\nreceived and defeated!", "mod.AP.lobby.trackermasterHint")
 
 textPool.register("Hintmaster", "mod.AP.lobby.npc.hintmaster")
 textPool.register("Codex", "mod.AP.lobby.npc.codex")
 textPool.register("Buffmaster", "mod.AP.lobby.npc.buffmaster")
 textPool.register("Settings", "mod.AP.lobby.npc.settingsmaster")
+textPool.register("Tracker", "mod.AP.lobby.npc.trackermaster")
 
 textPool.register("Characters", "mod.AP.lobby.itemCat.character")
 textPool.register("Weapons", "mod.AP.lobby.itemCat.weapon")
@@ -277,7 +299,7 @@ textPool.register("Archipelago Mode!\nBeat All Zones with %s characters\nto unlo
 textPool.register("Archipelago Mode!\nBeat Ensemble Mode\nto complete your game!", "mod.AP.lobby.ensembleHint")
 textPool.register("Archipelago Mode!\nBeat %s separate zones\nto unlock %s!", "mod.AP.lobby.zonesHint")
 textPool.register("Archipelago Mode!\nCollect %s Golden Lute Shards\nto unlock %s!", "mod.AP.lobby.shardsHint")
-textPool.register("Archipelago Mode!\nBeat all %s story bosses\nto unlock %s!", "mod.AP.lobby.storyHint")
+textPool.register("Archipelago Mode!\nBeat %s story bosses\nto unlock %s!", "mod.AP.lobby.storyHint")
 textPool.register("Archipelago Mode!\nGoal met!\nYour game is complete!", "mod.AP.lobby.noCatalystHint")
 textPool.register("These items will show up in runs!", "mod.AP.lobby.shopHint")
 textPool.register("Out of Stock! Find a Shop Restock!", "mod.AP.lobby.shopRestockHint")
@@ -285,11 +307,10 @@ textPool.register("Out of Stock! All items were sold!", "mod.AP.lobby.shopSoldOu
 textPool.register("Remove items from the\n AP item pool?", "mod.AP.lobby.janitorHint")
 textPool.register("Take these on your\n next AP run!", "mod.AP.lobby.dealerHint")
 textPool.register("Get hints from random runs!", "mod.AP.lobby.hintmasterHint")
-textPool.register("Settings", "mod.AP.lobby.settingsmasterHint")
+textPool.register("Configure Settings and Buffs!", "mod.AP.lobby.settingsmasterHint")
 textPool.register("Ensemble", "mod.AP.lobby.stair.ensemble")
 textPool.register("Boss Rush", "mod.AP.lobby.stair.bossRush")
 textPool.register("Archipelago Mode!\nDefeat all bosses in Boss Rush\nto complete your game!", "mod.AP.lobby.bossRushHint")
-textPool.register("Configure permanent\nrun buffs!", "mod.AP.lobby.buffmasterHint")
 textPool.register("Buff Room", "mod.AP.lobby.buffRoom")
 textPool.register("These buffs apply\nto all AP runs!", "mod.AP.lobby.buffRoomHint")
 textPool.register("Archipelago Mode!\nBuy the Victory Item\nto complete your game!", "mod.AP.lobby.expensivePurchaseHint")

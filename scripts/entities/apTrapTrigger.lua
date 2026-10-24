@@ -77,7 +77,7 @@ local function getZoneAccessKeyLockedText(zone)
         return nil
     end
 
-    return "Find the key to unlock!"
+    return "Receive access to unlock!"
 end
 
 
@@ -297,11 +297,10 @@ event.trapTrigger.add("apHintTrapSetup", {
 
     local lastZone = progression.isDLCEnabled("Amplified") and 5 or 4
 
-    -- Collect available characters: unlocked and not blacklisted.
     local availChars = {}
     for _, charName in ipairs(ecs.getEntityTypesWithComponents({ "playableCharacter", "!playableCharacterNonSelectable" })) do
         local charId = apCharacters.cotNDCharToAPLocation(charName)
-        if progression.getCharacters(charId) and not progression.getCharacterBlacklist(charId) then
+        if progression.getCharacters(charId) then
             table.insert(availChars, charName)
         end
     end

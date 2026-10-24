@@ -6,7 +6,6 @@ handlers.register("Handshake", function(message, ctx)
     local seed = message.seed or ""
     local playerName = message.playerName or ""
     local slot = message.slot or 0
-    print("HANDSHAKE", slot)
     ctx.seed = seed
     ctx.playerName = playerName
 

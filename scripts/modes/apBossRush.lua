@@ -105,6 +105,13 @@ local function unusedZoneBoss(used, zone)
     end
 end
 
+-- Boss Rush deals its own story bosses, so the character's are kept out of the sequence it builds on.
+event.levelSequenceUpdate.add("apBossRushNoStoryBosses", { order = "storyBosses", sequence = -1 }, function(ev)
+    if ev.mode.id == "APBossRush" then
+        ev.storyBossMode = proceduralRun.StoryBossMode.NO_STORY_BOSSES
+    end
+end)
+
 event.levelSequenceUpdate.add("apBossRushSequence", { order = "bossRush" }, function(ev)
     if ev.mode.id ~= "APBossRush" then return end
 

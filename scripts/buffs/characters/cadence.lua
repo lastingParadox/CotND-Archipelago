@@ -9,6 +9,8 @@ local apCharacters = require("AP.scripts.utils.apCharacters")
 local cadence = {}
 
 local grantedByBuff = {}
+local lobbyRolls = {}
+lobbyRolls = script.persist(function() return lobbyRolls end)
 
 local ITEM_COUNT = 3
 local BUFF_RNG_SEED = 8831
@@ -26,9 +28,7 @@ function cadence.revoke(entity)
     grantedByBuff[entity.id] = nil
 end
 
-function cadence.apply(entity, progression)
-    if not entity then return end
-
+local function rollItems(progression)
     local slotPool = {}
     for _, name in ecs.typesWithComponents({ "item", "itemSlot" }) do
         if progression.getItems(name)
@@ -55,13 +55,10 @@ function cadence.apply(entity, progression)
     end
     table.sort(slots)
 
-    if #slots == 0 then return end
-
     local channel = rng.makeChannel(currentLevel.getSeed(), 0, BUFF_RNG_SEED)
-    local count = math.min(ITEM_COUNT, #slots)
-    local grantedItems = {}
+    local names = {}
 
-    for i = 1, count do
+    for i = 1, math.min(ITEM_COUNT, #slots) do
         local remaining = #slots - (i - 1)
         local slotIdx = rng.int(remaining, channel) + 1
         local chosenSlot = slots[slotIdx]
@@ -69,7 +66,35 @@ function cadence.apply(entity, progression)
         slots[remaining] = chosenSlot
 
         local items = slotPool[chosenSlot]
-        local itemName = items[rng.int(#items, channel) + 1]
+        names[#names + 1] = items[rng.int(#items, channel) + 1]
+    end
+
+    return names
+end
+
+-- The run started from the lobby takes the lobby's roll; any later run rolls its own.
+function cadence.apply(entity, progression)
+    if not entity then return end
+
+    local playerID = entity.controllable and entity.controllable.playerID or 0
+    -- A body being spawned for a run is not controlled yet, so it carries its player as pending.
+    if playerID == 0 and entity.playableCharacter then
+        playerID = entity.playableCharacter.pendingPlayerID
+    end
+
+    local names
+
+    if currentLevel.isLobby() then
+        names = rollItems(progression)
+        lobbyRolls[playerID] = names
+    else
+        names = lobbyRolls[playerID] or rollItems(progression)
+        lobbyRolls[playerID] = nil
+    end
+
+    local grantedItems = {}
+
+    for _, itemName in ipairs(names) do
         local granted = inventory.replace(itemName, entity)
         if granted and granted.id then
             grantedItems[#grantedItems + 1] = granted.id

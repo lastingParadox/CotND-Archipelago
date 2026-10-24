@@ -3,6 +3,7 @@ local currentLevel = require "necro.game.level.CurrentLevel"
 local damage = require "necro.game.system.Damage"
 local ecs = require "system.game.Entities"
 local gameDLC = require "necro.game.data.resource.GameDLC"
+local player = require "necro.game.character.Player"
 local render = require "necro.render.Render"
 local sound = require "necro.audio.Sound"
 local ui = require "necro.render.UI"
@@ -20,6 +21,40 @@ local handlers = require("AP.scripts.client.initHandlers")
 -- Translucency of the deathlink name tag, 0..1, passed to drawText as `opacity`.
 local MARV_TAG_OPACITY = 0.5
 
+local DEATHLINK_COUNTDOWN = 32
+
+-- Starts a full countdown on the body, or ends it outright if one is already running.
+local function startCountdown(entity, message)
+    local countdown = entity.AP_damageCountdown
+    if not countdown then return end
+
+    if countdown.active then
+        local possessor = entity.Sync_possessable and ecs.getEntityByID(entity.Sync_possessable.possessor)
+
+        for _, victim in ipairs({ entity, possessor or nil }) do
+            damage.inflict({
+                victim = victim,
+                damage = 999,
+                type = apFlags.DAMAGE_DEATH_LINK,
+                killerName = message
+            })
+        end
+        return
+    end
+
+    apFlyaways.addToFlyawayQueue({
+        entity = entity,
+        text = "The clock's ticking down!"
+    })
+
+    countdown.countdown = DEATHLINK_COUNTDOWN
+    countdown.countdownReset = 0
+    countdown.damage = 999
+    countdown.type = apFlags.DAMAGE_DEATH_LINK
+    countdown.killerName = message
+    countdown.active = true
+end
+
 local function applyDeathlink(message)
     apLog("Applying deathlink from " .. message)
     local deathlinkType = apStorage.saveData.deathlinkType or apTypes.DeathlinkTypes.TEMPO
@@ -29,6 +64,14 @@ local function applyDeathlink(message)
     end
 
     sound.playUI("necrodancerLaugh")
+
+    if deathlinkType == apTypes.DeathlinkTypes.TEMPO then
+        -- The body each player is driving, so a possessed one shows and carries the countdown.
+        for _, entity in ipairs(player.getPlayerEntities()) do
+            startCountdown(entity, message)
+        end
+        return
+    end
 
     for entity in ecs.entitiesWithComponents({ "playableCharacter" }) do
         if deathlinkType == apTypes.DeathlinkTypes.ABSOLUTE then
@@ -54,23 +97,6 @@ local function applyDeathlink(message)
             chain.AP_followerDamageParentWhileDead.killerName = message
             chain.AP_followerDamageParentWhileDead.sounds = sounds
             chain.AP_marvDeathLinkTag.text = message
-        else
-            if entity.AP_damageCountdown.active or (entity.damageCountdown and entity.damageCountdown.countdown >= 0) then
-                damage.inflict({
-                    victim = entity,
-                    damage = 999,
-                    type = apFlags.DAMAGE_DEATH_LINK,
-                    killerName = message
-                })
-            else
-                apFlyaways.addToFlyawayQueue({
-                    entity = entity,
-                    text = "The clock's ticking down!"
-                })
-
-                entity.AP_damageCountdown.killerName = message
-                entity.AP_damageCountdown.active = true
-            end
         end
     end
 end
