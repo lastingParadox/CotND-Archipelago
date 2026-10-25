@@ -35,6 +35,7 @@ local outlineFilter = require("necro.render.filter.OutlineFilter")
 
 local apCharacters = require("AP.scripts.utils.apCharacters")
 local apClient = require("AP.scripts.client.client")
+local apColors = require("AP.scripts.utils.apColors")
 local apInventory = require("AP.scripts.utils.apInventory")
 local apPreview = require("AP.scripts.utils.apPreview")
 local progression = require("AP.scripts.client.progression")
@@ -233,12 +234,18 @@ event.objectUpdateTextLabel.add("apPersonalStats", {
     if isCharacterDisabled(characterType) or isCharacterLocked(characterType) then return end
 
     local character = apCharacters.cotNDCharToAPLocation(characterType)
-    local charData = progression.getCharacterLocations(character)
-    if charData == nil then return end
 
     local append = function(s)
         ev.text = ev.text and ev.text .. "\n" .. s or s
     end
+
+    if progression.getCharacterBlacklist(character) then
+        append(textFormat.color("Disabled", apColors.disabled))
+        return
+    end
+
+    local charData = progression.getCharacterLocations(character)
+    if charData == nil then return end
 
     if isCharacterComplete(charData, character) then
         append(textFormat.color("Complete", theme.Color.HIGHLIGHT))

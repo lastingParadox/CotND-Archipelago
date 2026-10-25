@@ -418,7 +418,8 @@ indicators register a poll-based provider with
 the harness registers real Lua-console commands with no patching. Enable the debug console
 in Options → Advanced, then **Shift+F4**. `aptest()` runs every test (`aptest("filter")` a
 subset) and reports a summary in chat and the log; `aptests()` only lists what is registered;
-`aptestwatch()` toggles level tests on each floor load. The engine's own suite is at
+`aptestwatch()` toggles level tests on each floor load. The console only runs registered commands,
+never arbitrary Lua; `apsongs()` reports the Song Randomizer's effective config and who supplied it. The engine's own suite is at
 `necro/test/Test.lua` and is worth reading before extending this one.
 
 ```lua

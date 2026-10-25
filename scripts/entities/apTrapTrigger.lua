@@ -8,6 +8,7 @@ local rng = require "necro.game.system.RNG"
 local sound = require "necro.audio.Sound"
 local tile = require("necro.game.tile.Tile")
 local tileTypes = require "necro.game.tile.TileTypes"
+local utils = require "system.utils.Utilities"
 local hasStorage, _ = pcall(require, "system.file.Storage")
 local hasClient, _ = pcall(require, "system.network.Client")
 
@@ -333,7 +334,20 @@ event.trapTrigger.add("apHintTrapSetup", {
     ev.trap.trapStartRun.options = { characterOverride = chosenChar }
 end)
 
--- Switches to "APSingleZone" when only one zone is reachable.
+-- The zones in the order the selected characters would play them, reversed for Aria.
+local function playOrderZones()
+    local zones = progression.getZoneList()
+
+    for _, characterName in pairs(player.getSelectedPlayerCharacters()) do
+        if ecs.typeHasComponent(characterName, "traitReverseZoneOrder") then
+            return utils.reverse(zones)
+        end
+    end
+
+    return zones
+end
+
+-- Starts "APSingleZone" when only one zone is reachable, for this trigger only.
 event.trapTrigger.add("apZonesModeSingleZone", {
     filter = "trapStartRun",
     order = "descend",
@@ -342,11 +356,24 @@ event.trapTrigger.add("apZonesModeSingleZone", {
     if not ev.success then return end
     if ev.trap.trapStartRun.mode ~= "AP_APAllZones" then return end
 
-    local accessible = progression.getAccessibleZones()
+    local accessible = progression.getAccessibleZones(playOrderZones())
     if #accessible ~= 1 then return end
 
+    ev.apAllZonesTrap = { zone = ev.trap.trapStartRun.zone }
     ev.trap.trapStartRun.mode = "AP_APSingleZone"
     ev.trap.trapStartRun.zone = accessible[1]
+end)
+
+-- Puts the trapdoor back once the run has read it, so it stays an AP Zones trapdoor.
+event.trapTrigger.add("apZonesModeRestore", {
+    filter = "trapStartRun",
+    order = "descend",
+    sequence = 1,
+}, function(ev)
+    if not ev.apAllZonesTrap then return end
+
+    ev.trap.trapStartRun.mode = "AP_APAllZones"
+    ev.trap.trapStartRun.zone = ev.apAllZonesTrap.zone
 end)
 
 event.trapTrigger.add("handleAPTrapUnlock", {

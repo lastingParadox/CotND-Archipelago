@@ -1,8 +1,12 @@
+local chat = require "necro.client.Chat"
 local ecs = require "system.game.Entities"
 local focus = require "necro.game.character.Focus"
 local gameState = require "necro.client.GameState"
+local music = require "necro.audio.Music"
+local hasDebugCommands, debugCommands = pcall(require, "necro.debug.DebugCommands")
 
 local apClient = require("AP.scripts.client.client")
+local apLog = require("AP.scripts.utils.log").apLog
 local apUtils = require("AP.scripts.utils.apUtils")
 local progression = require("AP.scripts.client.progression")
 
@@ -33,8 +37,10 @@ function apSongRandomizer.isOverriding()
     return isAPListener()
 end
 
+local hasRandomizer, randomizer = pcall(require, "CustomArtists.scripts.randomizer.Randomizer")
+
 -- Registered only while Custom Artists is loaded.
-if pcall(require, "CustomArtists.scripts.randomizer.Randomizer") then
+if hasRandomizer then
     event.customArtistsSongRandomizer.add("apSongRandomizer", { order = "override" }, function(ev)
         if not apSongRandomizer.isOverriding() then return end
 
@@ -57,6 +63,33 @@ end)
 event.gameStateLevel.add("apClearAPLobbyTeleportPending", { order = "splitScreen", sequence = 1 }, function()
     lobbyTeleportPending = false
 end)
+
+-- Reports the settings the current track is dealt with, and whether AP is the one supplying them.
+local function reportSongRandomizer()
+    local lines = {
+        ("connected=%s pending=%s apListener=%s"):format(tostring(apClient.isSessionConnected()),
+            tostring(lobbyTeleportPending), tostring(isAPListener())),
+    }
+
+    if hasRandomizer then
+        local config = randomizer.getConfig()
+        lines[#lines + 1] = ("source=%s mode=%s seeding=%s seed=%s duplicates=%s"):format(tostring(config.source),
+            tostring(config.mode), tostring(config.seeding), tostring(config.seed), tostring(config.duplicates))
+    end
+
+    local params = music.getParameters() or {}
+    lines[#lines + 1] = ("track type=%s zone=%s floor=%s boss=%s"):format(tostring(params.type),
+        tostring(params.zone), tostring(params.floor), tostring(params.boss))
+
+    for _, line in ipairs(lines) do
+        chat.addMessage({ name = "apSongs", text = line })
+        apLog("apsongs: " .. line)
+    end
+end
+
+if hasDebugCommands then
+    debugCommands.register("apsongs", reportSongRandomizer)
+end
 
 -- Runs after Custom Artists pins every shrine to its own mode.
 event.updateVisuals.add("apSongRandomizerShrineFrame", { order = "equipmentSprite", sequence = 1 }, function()
