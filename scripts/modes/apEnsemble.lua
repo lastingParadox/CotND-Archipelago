@@ -43,7 +43,7 @@ multiCharacter.Mode.extend("AP_ENSEMBLE", enum.data({
 
         for _, charName in ipairs(progression.getPlayableCharacters()) do
             local cotndName = apCharacters.apLocationToCotNDChar(charName)
-            if ecs.typeHasComponent(cotndName, "controllable") then
+            if ecs.typeHasComponent(cotndName, "controllable") and not progression.getCharacterBlacklist(charName) then
                 table.insert(result, cotndName)
             end
         end

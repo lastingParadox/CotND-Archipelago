@@ -72,7 +72,7 @@ end
 
 event.levelLoad.add("apGenerateLobbyNpcs", "progression", function(ev)
     local cagedNPCs = progression.getCagedNPCs()
-    if not cagedNPCs or not apUtils.isAPContext() then return end
+    if not cagedNPCs or not apUtils.isAPContext() or not currentLevel.isRegularFloor() then return end
 
     local curZone  = currentLevel.getZone()
     local curFloor = currentLevel.getFloor()

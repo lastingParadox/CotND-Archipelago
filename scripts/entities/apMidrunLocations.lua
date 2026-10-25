@@ -191,7 +191,7 @@ event.levelLoad.add("apLoadMidrunLocations", { order = "extraEntities", sequence
     claimedTiles = {}
 
     if not itemChecksActive() then return end
-    if currentLevel.isLobby() or currentLevel.isBoss() then return end
+    if not currentLevel.isRegularFloor() then return end
     if not progression.getItemChecks() then return end
 
     for _, container in ipairs(containersInLevel()) do
@@ -249,7 +249,7 @@ end)
 event.levelLoad.add("apSpawnUpgradeChests", { order = "extraEntities" }, function()
     if not apUtils.isAPContext() then return end
     if gameSession.getCurrentMode().id == "APBossRush" then return end
-    if currentLevel.isBoss() then return end
+    if not currentLevel.isRegularFloor() then return end
 
     local anchor = player.getPlayerEntities()[1]
     if not anchor then return end
