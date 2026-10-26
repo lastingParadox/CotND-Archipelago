@@ -22,7 +22,13 @@ event.itemGenerate.add("apKlarinettaBuffZweihanderPool", {
             local isZweihander = item.Sync_weaponCollisionCheck ~= nil
             local isScroll = item.AP_klarinettaWeaponScroll ~= nil
             if isZweihander or isScroll then
-                return hasBuff and true or false
+                if not hasBuff then return false end
+
+                local slot = item.itemSlot and item.itemSlot.name
+                if args.slot and slot ~= args.slot then return false end
+                if args.bannedSlots and args.bannedSlots[slot or ""] then return false end
+
+                return not (args.transmutedItem and item.name == args.transmutedItem.name)
             end
         end
         return baseFilter and baseFilter(item, args, player) or false

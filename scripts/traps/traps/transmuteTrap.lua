@@ -1,7 +1,9 @@
 local inventory       = require "necro.game.item.Inventory"
 local itemGeneration  = require "necro.game.item.ItemGeneration"
 local object          = require "necro.game.object.Object"
+local rng             = require "necro.game.system.RNG"
 local spellTransmute  = require "necro.game.spell.SpellTransmute"
+local turn            = require "necro.cycles.Turn"
 
 local trapSystem = require "AP.scripts.traps.trapSystem"
 
@@ -46,6 +48,8 @@ trapSystem.define({
                 itemPool       = itemGeneration.Pool.CHEST,
                 transmutedItem = item,
                 slot           = slot,
+                seed           = rng.getDungeonSeed() + turn.getCurrentTurnID() + item.id,
+                seenCounts     = {},
             })
             if target then
                 spellTransmute.transmuteItem({

@@ -41,11 +41,8 @@ event.objectPostConvert.add("apEnemyOrigin", { order = "resetFields", sequence =
     apEnemyOrigin[ev.entity.id] = locationOfType(ev.oldType)
 end)
 
--- Only kills credited to a player count, including ones the engine forwards from a bomb or summon.
-event.objectDeath.add("apEnemyCheck", { order = "statistics", sequence = 1 }, function(ev)
-    if not enemyChecksActive() or not player.isPlayerEntity(ev.killer) then return end
-
-    local location = apEnemyOrigin[ev.entity.id] or locationOfType(ev.entity.name)
+local function sendEnemyCheck(entity, killer)
+    local location = apEnemyOrigin[entity.id] or locationOfType(entity.name)
     if not location then return end
 
     local defeated = apStorage.saveData.characterLocations["Enemies"] or {}
@@ -57,5 +54,21 @@ event.objectDeath.add("apEnemyCheck", { order = "statistics", sequence = 1 }, fu
     progression.sendLocationChecks({ location })
 
     local name = location:gsub("^Defeat ", "")
-    apFlyaways.addToFlyawayQueue({ entity = ev.killer, text = name .. " " .. L("defeated", "ap.defeated") })
+    apFlyaways.addToFlyawayQueue({ entity = killer, text = name .. " " .. L("defeated", "ap.defeated") })
+end
+
+-- Only kills credited to a player count, including ones the engine forwards from a bomb or summon.
+event.objectDeath.add("apEnemyCheck", { order = "statistics", sequence = 1 }, function(ev)
+    if enemyChecksActive() and player.isPlayerEntity(ev.killer) then
+        sendEnemyCheck(ev.entity, ev.killer)
+    end
 end)
+
+-- A player's blocked hit that makes an enemy despawn itself, as a pixie's explosion does, is a kill.
+event.objectTakeDamage.add("apEnemyShieldHitCheck", { filter = "castOnShieldHit", order = "spellLate", sequence = 1 },
+    function(ev)
+        if ev.shielded and ev.entity.gameObject.despawned and player.isPlayerEntity(ev.attacker)
+            and enemyChecksActive() then
+            sendEnemyCheck(ev.entity, ev.attacker)
+        end
+    end)

@@ -1,24 +1,64 @@
+local customEntities = require("necro.game.data.CustomEntities")
 local ecs     = require("system.game.Entities")
 local gameDLC = require("necro.game.data.resource.GameDLC")
+local itemBan = require("necro.game.item.ItemBan")
 local object  = require("necro.game.object.Object")
 local rng     = require("necro.game.system.RNG")
+local utils   = require("system.utils.Utilities")
 
 local possession = require("Sync.character.chaunter.Possession")
 
 local trapSystem = require("AP.scripts.traps.trapSystem")
 
 local MARV_CHANCE = 0.05
+local MARV_POSSESSION_BEATS = 64
 
-event.entitySchemaLoadNamedEntity.add("apMarvPossessable", { key = "Marv" }, function(ev)
-	ev.entity.Sync_possessable = {}
-	ev.entity.Sync_possessableGlow = {}
-	ev.entity.Sync_possessableItemUser = {}
-	ev.entity.controllable = {}
-	ev.entity.inventory = {}
-	ev.entity.equipment = {}
-	ev.entity.invincibility = {}
-	ev.entity.invincibilityBlinkEffect = {}
-	ev.entity.beatDelay = {}
+local MARV_VISUALS = {
+	"sprite", "positionalSprite", "spriteSheet", "normalAnimation", "visualExtent",
+	"shadow", "shadowPosition", "facingMirrorX", "setFacingOnMove", "tween",
+}
+
+local SLIME_EXTRAS = {
+	"parityAnimation", "tellAnimation", "blinkAnimation", "innateAttack",
+	"dropCurrencyOnDeath", "enemyUnlockOnDeath", "bloodColor", "setFacingFromPattern",
+}
+
+customEntities.extend({
+	name       = "TrapMarv",
+	template   = customEntities.template.enemy("slime", 3),
+	components = {
+		friendlyName = { name = "Marv" },
+		editorHidden = {},
+	},
+})
+
+-- Dresses the possessable slime body as a harmless Marv.
+event.entitySchemaGenerate.add("apDressTrapMarv", { order = "customEntities", sequence = 101 }, function(ev)
+	local marv, body
+	for _, entity in ipairs(ev.entityTypes) do
+		if entity.name == "Marv" then
+			marv = entity
+		elseif entity.name == "AP_TrapMarv" then
+			body = entity
+		end
+	end
+	if not (marv and body) then return end
+
+	for _, component in ipairs(MARV_VISUALS) do
+		body[component] = marv[component] and utils.fastCopy(marv[component]) or nil
+	end
+	for _, component in ipairs(SLIME_EXTRAS) do
+		body[component] = nil
+	end
+	utils.mergeTablesRecursive(body, { inventoryBannedItems = { components = { weapon = itemBan.Type.FULL } } })
+	body.Sync_possessableTimer = { remainingBeats = MARV_POSSESSION_BEATS, beatsAfterDamage = 0 }
+
+	for key in pairs(body) do
+		if key:sub(1, 5) == "voice" then body[key] = nil end
+	end
+	for key, value in pairs(marv) do
+		if key:sub(1, 5) == "voice" then body[key] = utils.fastCopy(value) end
+	end
 end)
 
 local baseAnimals = {
@@ -84,7 +124,7 @@ local function tryTransformPlayer(playerEntity, channel, pool)
 		removeValue(remaining, animalType)
 
 		local animal = object.spawn(animalType, playerEntity.position.x, playerEntity.position.y)
-		if animal and possession.attach(playerEntity, animal) then
+		if animal and not animal.gameObject.despawned and possession.attach(playerEntity, animal) then
 			return true
 		end
 
@@ -121,12 +161,17 @@ trapSystem.define({
 	flyaway   = "Animal Trap!",
 	perPlayer = true,
 	stateful  = true,
+	guard     = function(ctx)
+		for _, entry in ipairs(ctx.players) do
+			if possession.getPossessor(entry.entity) then return false end
+		end
+	end,
 	apply     = function(ctx)
 		local pool = getAnimalPool()
 		if #pool == 0 then return false end
 
 		local transformed = rng.roll(MARV_CHANCE, ctx.channel)
-			and tryTransformPlayer(ctx.entity, ctx.channel, { "Marv" })
+			and tryTransformPlayer(ctx.entity, ctx.channel, { "AP_TrapMarv" })
 
 		transformed = transformed or tryTransformPlayer(ctx.entity, ctx.channel, pool)
 

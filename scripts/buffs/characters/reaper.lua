@@ -6,8 +6,8 @@ local hasSkins, SkinSprite = pcall(require, "CharacterSkins.SkinSprite")
 local _, SkinTemplate      = pcall(require, "CharacterSkins.SkinTemplate")
 local gfx          = require("system.gfx.GFX")
 
-local RESILIENT_SPRITE      = "mods/AP/gfx/soul_follower.png"
-local RESILIENT_SPRITE_RIFT = "mods/AP/gfx/soul_follower_rift.png"
+local RESILIENT_SPRITE      = "mods/AP/gfx/entities/soul_follower.png"
+local RESILIENT_SPRITE_RIFT = "mods/AP/gfx/entities/soul_follower_rift.png"
 
 local reaper = {}
 

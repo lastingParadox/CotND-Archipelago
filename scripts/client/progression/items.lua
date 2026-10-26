@@ -16,6 +16,20 @@ local function magicFoodBase(itemName)
     return suffix and ("Food" .. suffix) or nil
 end
 
+-- Base weapons whose AP item is not named after their material variants.
+local BASE_WEAPON_ALIASES = {
+    AP_WeaponZweihander = "Sync_WeaponReallyBigSword",
+}
+
+-- The prefix keeps modded weapons resolvable, e.g. Sync_WeaponTitaniumTrident.
+local function splitMaterialWeapon(itemName)
+    local prefix, material, shape = itemName:match("^(.-)Weapon([A-Z][a-z]+)(.+)$")
+    if not (material and shape) then return nil end
+
+    local baseWeapon = prefix .. "Weapon" .. shape
+    return BASE_WEAPON_ALIASES[baseWeapon] or baseWeapon, "AP_Material" .. material
+end
+
 local function resolveCompositeItem(items, itemName)
     if not itemName then
         return items
@@ -26,15 +40,9 @@ local function resolveCompositeItem(items, itemName)
     end
 
     do
-        -- The prefix keeps modded weapons resolvable, e.g. Sync_WeaponTitaniumTrident.
-        local prefix, material, shape = itemName:match("^(.-)Weapon([A-Z][a-z]+)(.+)$")
-        if material and shape then
-            local baseWeapon = prefix .. "Weapon" .. shape
-            local materialItem = "AP_Material" .. material
-
-            if items[baseWeapon] and items[materialItem] then
-                return { items[baseWeapon], items[materialItem] }
-            end
+        local baseWeapon, materialItem = splitMaterialWeapon(itemName)
+        if baseWeapon and items[baseWeapon] and items[materialItem] then
+            return { items[baseWeapon], items[materialItem] }
         end
     end
 
@@ -56,15 +64,9 @@ local function resolveCompositeBan(banned, itemName)
     end
 
     do
-        -- The prefix keeps modded weapons resolvable, e.g. Sync_WeaponTitaniumTrident.
-        local prefix, material, shape = itemName:match("^(.-)Weapon([A-Z][a-z]+)(.+)$")
-        if material and shape then
-            local baseWeapon = prefix .. "Weapon" .. shape
-            local materialItem = "AP_Material" .. material
-
-            if banned[baseWeapon] or banned[materialItem] then
-                return { banned[baseWeapon], banned[materialItem] }
-            end
+        local baseWeapon, materialItem = splitMaterialWeapon(itemName)
+        if baseWeapon and (banned[baseWeapon] or banned[materialItem]) then
+            return { banned[baseWeapon], banned[materialItem] }
         end
     end
 

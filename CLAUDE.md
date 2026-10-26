@@ -641,6 +641,10 @@ rather than testing mode ids by hand.
   calls `setControlledEntity`, so inside `objectSpawn` (where the initial inventory and every buff
   is granted) `controllable.playerID` is 0. The id is in `playableCharacter.pendingPlayerID`;
   anything keyed by player across the lobby → run boundary must fall back to it.
+- **Not every defeated enemy dies.** Every `explosion.registerExplosion` spell carries
+  `spellcastDespawnCaster`, so a pixie hit by a player is deleted by its own explosion and
+  `objectDeath` never fires. `apEnemyChecks` catches it at `objectTakeDamage` order `spellLate`,
+  sequence 1, where the shielded hit's player attacker is still on the event.
 - **The walkable lobby counts as in game.** It runs as the `IN_GAME` state with the lobby flag,
   so `gameState.isInGame()` and `isInLobby()` are both true there; only `isInLobby()` tells it
   apart from a run.
@@ -649,6 +653,11 @@ rather than testing mode ids by hand.
   the wall, and it carries `character`. Before moving a player onto a character's tile,
   check the tile with `collision.check(x, y, mask(WALL, BORDER))`
   ([swapTrap.lua](scripts/traps/traps/swapTrap.lua)).
+- **`object.spawn` can hand back an enemy that is already gone.** On a procedural floor,
+  `EnemySubstitutions` deletes any spawned enemy listed in a living player's `enemyBans` (Dove:
+  Harpy and every Monkey) inside `objectSpawn`. Check `gameObject.despawned` before using the
+  result; possessing one leaves the player controlling a deleted entity, and every read of
+  that body then raises from `Entities.lua`.
 - **`descent.active` spans the level transition.** It is set on the stairs and cleared only
   by `objectDescentArrive` on the next floor, so it is the simulated signal that a level change
   is in flight. No trap lands while any player is descending; `trapHandler` keeps it queued
